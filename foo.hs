@@ -1,11 +1,9 @@
 
--- get board coord = board !! (coord !! 0) !! (coord !! 1)
+-- foo around wth input .. two numbers per line .. print it back after C-d
 
-data Matrix a = Cell a | Nested (Matrix [a])
+import Control.Monad
 
-get :: Num a => Matrix a -> [a] -> a
-get (Nested (Nested space)) (dim:dims) = if null dims then val else get val dims where val = space !! dim
-
-main = do
-  print "hi"
-
+main = forever $ do
+    l <- getLine
+    putStrLn l
+    

@@ -1,7 +1,4 @@
-
 import Data.Array
-
-type Coord = (Int, Int)
 
 newtype Board = Board (Array (Int, Int) Char)
 
@@ -16,7 +13,7 @@ showBoard (Board b) =
     unlines (map (\r -> concat $ map (\c -> [' ', b ! (r, c)]) [sc..ec]) [sr..er])
     where ((sr, sc), (er, ec)) = bounds b
 
-endp :: Board -> Coord -> Bool
+endp :: Board -> (Int, Int) -> Bool
 endp (Board b) coord 
     = moved && (winner || tie)
       where moved = xo /= '_'
@@ -35,15 +32,39 @@ endp (Board b) coord
 emptyBoard :: Board
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
 
-data Result = X_Win | O_Win | Tie
-data Turn = X_Turn | O_Turn
-data InPlay = InPlay
+--
+
+data PlayState = PlayState
     { board :: Board
     , turn :: Turn
     }
-data Game = InPlay | Result
+data Turn = X_Turn | O_Turn
 
+nextTurn :: Turn -> Turn
+nextTurn X_Turn = O_Turn
+nextTurn O_Turn = X_Turn
+
+turnValue :: Turn -> Char
+turnValue X_Turn = 'X'
+turnValue O_Turn = 'O'
+
+play :: PlayState -> (Int, Int) -> PlayState
+play (PlayState (Board b) t) move
+    = PlayState (Board (b // [(move, turnValue t)]))
+                (nextTurn t)
+
+-- next .. take user input .. need a function that takes an IO String
+    -- extracts coordinate from IO String (getLine) and applies it to the game
+    -- then calls getLine again until endp
+
+-- TODO refactor endp to return Game instead of Bool, instaed of True returns one of Result data constructors
+-- and instead of false would return the PlayState .. AHHH not really
+-- endp should return some info about the result though .. doesn't have to be PlayState
+-- create another datatype just for checking if it's terminal(?)
+data Result = X_Win | O_Win | Tie
+data Game = InPlay PlayState | Result
 main = do 
-    -- print $ endp ["XOX", "OXX", "O_X"] [0, 0]
+    -- print $ endp ["XOX", "OXX", "O_X"] [0, 0] -- create test case handler
     print emptyBoard
-    print $ endp emptyBoard (0,0)
+    -- print $ endp emptyBoard (0,0)
+    putStr "okay, let's start playing a game\n\n"
