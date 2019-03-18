@@ -1,4 +1,5 @@
 import Data.Array
+import Data.Char
 
 newtype Board = Board (Array (Int, Int) Char)
 
@@ -10,61 +11,81 @@ allCells = [(i, j) | i <- [0..2], j <- [0..2]]
 
 showBoard :: Board -> String
 showBoard (Board b) =
-    unlines (map (\r -> concat $ map (\c -> [' ', b ! (r, c)]) [sc..ec]) [sr..er])
-    where ((sr, sc), (er, ec)) = bounds b
+    unlines (map (\r -> concat $ map (\c -> [' ', coordF b (r, c)])
+                                     [sc..ec]) [sr..er])
+    where ((sr, sc), (er, ec)) = bounds b -- s - start, r - row, e - end, c - col
+          coordF b c = let v = b ! c
+                         in if v == '_'
+                              then intToDigit (c21 c)
+                              else v
 
-endp :: Board -> (Int, Int) -> Bool
-endp (Board b) coord 
-    = moved && (winner || tie)
-      where moved = xo /= '_'
-            winner = any (== 2) $ map (\dir@(x, y) -> sum $ map count
-                                                                [((-1)*x, (-1)*y), dir])
-                                      [(0, 1), (1, 1), (1, 0), (1, -1)]
-            count diff = follow $ next coord
-                where follow crd = if valid crd && b ! crd == xo
-                                      then 1 + (follow (next crd))
-                                      else 0
-                      next (x, y) = (x + fst diff, y + snd diff)
-            valid (x, y) = val x && val y where val x = x >= 0 && x < 3
-            tie = all (== '_') [b ! cell | cell <- allCells]
-            xo = b ! coord
+data GameStateResult = X_Win | O_Win | Tie | InPlay
+
+gameState :: Board -> (Int, Int) -> GameStateResult
+gameState (Board b) coord 
+  | xo == '_' = InPlay
+  | winner    = if xo == 'X' then X_Win else O_Win
+  | tie       = Tie
+  | otherwise = InPlay
+    where xo = b ! coord
+          winner = any (== 2) $ map (\dir@(x, y) -> sum $ map count
+                                                              [((-1)*x, (-1)*y), dir])
+                                    [(0, 1), (1, 1), (1, 0), (1, -1)]
+          count diff = follow $ next coord
+            where follow crd = if valid crd && b ! crd == xo
+                                  then 1 + (follow (next crd))
+                                  else 0
+                  next (x, y) = (x + fst diff, y + snd diff)
+          valid (x, y) = val x && val y
+          val x = x >= 0 && x < 3
+          tie = all (== '_') [b ! cell | cell <- allCells]
 
 emptyBoard :: Board
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
 
---
+-- ******************************************************************
 
-data PlayState = PlayState
-    { board :: Board
-    , turn :: Turn
-    }
-data Turn = X_Turn | O_Turn
+move :: Board -> (Int, Int) -> Char -> Board
+move (Board board) coord stone = Board (board // [(coord, stone)])
 
-nextTurn :: Turn -> Turn
-nextTurn X_Turn = O_Turn
-nextTurn O_Turn = X_Turn
+c12 :: Int -> (Int, Int)
+c12 y = (div x 3, mod x 3) where x = y-1
+c21 :: (Int,Int) -> Int
+c21 (x, y) = x*3 + y + 1
 
-turnValue :: Turn -> Char
-turnValue X_Turn = 'X'
-turnValue O_Turn = 'O'
+-- ******************************************************************
 
-play :: PlayState -> (Int, Int) -> PlayState
-play (PlayState (Board b) t) move
-    = PlayState (Board (b // [(move, turnValue t)]))
-                (nextTurn t)
+-- data PlayState = PlayState
+--     { board :: Board
+--     , turn :: Turn
+--     }
+-- data Turn = X_Turn | O_Turn
 
--- next .. take user input .. need a function that takes an IO String
-    -- extracts coordinate from IO String (getLine) and applies it to the game
-    -- then calls getLine again until endp
+-- consider returning result (winner, tie) instead of Bool from gameState
+-- consider handler for parsing board states and test cases
 
--- TODO refactor endp to return Game instead of Bool, instaed of True returns one of Result data constructors
--- and instead of false would return the PlayState .. AHHH not really
--- endp should return some info about the result though .. doesn't have to be PlayState
--- create another datatype just for checking if it's terminal(?)
-data Result = X_Win | O_Win | Tie
-data Game = InPlay PlayState | Result
-main = do 
-    -- print $ endp ["XOX", "OXX", "O_X"] [0, 0] -- create test case handler
-    print emptyBoard
-    -- print $ endp emptyBoard (0,0)
-    putStr "okay, let's start playing a game\n\n"
+-- data Game = InPlay PlayState | Result
+
+-- consider combining gameState with move somehow ... seems more .. organic?
+
+main = do
+  print emptyBoard
+  go emptyBoard 'X'
+  where go b stone
+          = do c <- getChar
+               putStrLn "\n"
+               if c >= '1' && c <= '9'
+                  then let coord = c12 (digitToInt c)
+                           nb = move b coord stone
+                           ns = if stone == 'X' then 'O' else 'X'
+                       in do print nb
+                             case gameState nb coord of InPlay -> go nb ns
+                                                        X_Win -> print "X Wins!"
+                                                        O_Win -> print "O Wins!"
+                                                        Tie -> print "Tie Game!"
+                  else do print b
+                          print "end"
+
+-- the way to make the code "maintainable" may be to map a name onto as much as possible
+-- then it might make things really customizable / easy to change ..
+-- divide the code into "grabbable" parts (e.g. names)
