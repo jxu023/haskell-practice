@@ -1,13 +1,15 @@
 import Data.Array
 import Data.Char
 
+allCells :: (Num a, Enum a) => [(a, a)]
+allCells = [(i, j) | i <- [0..2], j <- [0..2]]
+
+-- ******************************************************************
+
 newtype Board = Board (Array (Int, Int) Char)
 
 instance Show Board where
     show = showBoard
-
-allCells :: (Num a, Enum a) => [(a, a)]
-allCells = [(i, j) | i <- [0..2], j <- [0..2]]
 
 showBoard :: Board -> String
 showBoard (Board b) =
@@ -18,6 +20,8 @@ showBoard (Board b) =
                          in if v == '_'
                               then intToDigit (c21 c)
                               else v
+
+-- ******************************************************************
 
 data GameStateResult = X_Win | O_Win | Tie | InPlay
 
@@ -39,6 +43,8 @@ gameState (Board b) coord
           valid (x, y) = val x && val y
           val x = x >= 0 && x < 3
           tie = all (== '_') [b ! cell | cell <- allCells]
+
+-- ******************************************************************
 
 emptyBoard :: Board
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
@@ -80,8 +86,8 @@ main = do
                            ns = if stone == 'X' then 'O' else 'X'
                        in do print nb
                              case gameState nb coord of InPlay -> go nb ns
-                                                        X_Win -> print "X Wins!"
-                                                        O_Win -> print "O Wins!"
+                                                        X_Win -> print "X Wins!" -- print is repetitiouss
+                                                        O_Win -> print "O Wins!" -- refactor w/ assoc list
                                                         Tie -> print "Tie Game!"
                   else do print b
                           print "end"
