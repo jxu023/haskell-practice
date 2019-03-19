@@ -1,6 +1,30 @@
 
+tic tac toe > min max > 5 in a row > monte carlo > go > mind ninja
+    perhaps add some probability stuff at some point
+    try HLearn
 
--- operator precendence ... hard in haskell ... easy in lisp
+the attractive thing about computing has always been trying to encode
+some kind of human though ...
+    articles say it fails
+    but ... how about trying it for yourself first ...
+    like ... how does a person decide where to play?
+    they come up with reasons for things .. and you could try to
+    encode this reasoning process? heuristics etc...
+    could help with improving your own reasoning too perahps
+    making it more conscious i mean
+
+2048 to fit in somehow
+
+how about busy beaver as another haskell practice thing?
+https://www.scottaaronson.com/writings/bignumbers.html
+
+other graph theory stuff?
+
+haskell trip ups
+    operator precendence
+    compiler error messages
+    types
+    indentation
 
 -- functional means everything is an expression, everything does nothing but return a value
 -- chain these functions(expressions, same thing(?)) together
@@ -21,8 +45,6 @@
 --            count c [dr, dc] = undefined
 
 -- maybe just type backwards ... go up?
-
-
 
 -- **** how can i apply multiple predicates to the same data and everything together ... good pattern ..***
   -- valid nr nc and stuff ...

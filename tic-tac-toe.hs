@@ -59,6 +59,9 @@ c12 y = (div x 3, mod x 3) where x = y-1
 c21 :: (Int,Int) -> Int
 c21 (x, y) = x*3 + y + 1
 
+validMove :: Board -> (Int, Int) -> Bool
+validMove (Board b) c = b ! c == '_'
+
 -- ******************************************************************
 
 -- data PlayState = PlayState
@@ -73,6 +76,9 @@ c21 (x, y) = x*3 + y + 1
 -- data Game = InPlay PlayState | Result
 
 -- consider combining gameState with move somehow ... seems more .. organic?
+-- consider moving more logic into pure functions
+
+-- ******************************************************************
 
 main = do
   print emptyBoard
@@ -86,11 +92,13 @@ main = do
                            ns = if stone == 'X' then 'O' else 'X'
                        in do print nb
                              case gameState nb coord of InPlay -> go nb ns
-                                                        X_Win -> print "X Wins!" -- print is repetitiouss
+                                                        X_Win -> print "X Wins!" -- print is repetitious
                                                         O_Win -> print "O Wins!" -- refactor w/ assoc list
                                                         Tie -> print "Tie Game!"
                   else do print b
                           print "end"
+
+-- ******************************************************************
 
 -- the way to make the code "maintainable" may be to map a name onto as much as possible
 -- then it might make things really customizable / easy to change ..
