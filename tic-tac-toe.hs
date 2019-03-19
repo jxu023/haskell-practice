@@ -6,7 +6,10 @@ allCells = [(i, j) | i <- [0..2], j <- [0..2]]
 
 -- ******************************************************************
 
-newtype Board = Board (Array (Int, Int) Char)
+type Stone = Char
+type Coord = (Int, Int)
+
+newtype Board = Board (Array Coord Stone)
 
 instance Show Board where
     show = showBoard
@@ -25,7 +28,7 @@ showBoard (Board b) =
 
 data GameStateResult = X_Win | O_Win | Tie | InPlay
 
-gameState :: Board -> (Int, Int) -> GameStateResult
+gameState :: Board -> Coord -> GameStateResult
 gameState (Board b) coord 
   | xo == '_' = InPlay
   | winner    = if xo == 'X' then X_Win else O_Win
@@ -51,7 +54,7 @@ emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
 
 -- ******************************************************************
 
-move :: Board -> (Int, Int) -> Char -> Board
+move :: Board -> Coord -> Stone -> Board
 move (Board board) coord stone = Board (board // [(coord, stone)])
 
 c12 :: Int -> (Int, Int)
@@ -59,7 +62,7 @@ c12 y = (div x 3, mod x 3) where x = y-1
 c21 :: (Int,Int) -> Int
 c21 (x, y) = x*3 + y + 1
 
-validMove :: Board -> (Int, Int) -> Bool
+validMove :: Board -> Coord -> Bool
 validMove (Board b) c = b ! c == '_'
 
 -- ******************************************************************
@@ -70,7 +73,6 @@ validMove (Board b) c = b ! c == '_'
 --     }
 -- data Turn = X_Turn | O_Turn
 
--- consider returning result (winner, tie) instead of Bool from gameState
 -- consider handler for parsing board states and test cases
 
 -- data Game = InPlay PlayState | Result
@@ -90,13 +92,17 @@ main = do
                   then let coord = c12 (digitToInt c)
                            nb = move b coord stone
                            ns = if stone == 'X' then 'O' else 'X'
-                       in do print nb
-                             case gameState nb coord of InPlay -> go nb ns
-                                                        X_Win -> print "X Wins!" -- print is repetitious
-                                                        O_Win -> print "O Wins!" -- refactor w/ assoc list
-                                                        Tie -> print "Tie Game!"
-                  else do print b
-                          print "end"
+                       in if validMove b coord
+                             then do print nb
+                                     case gameState nb coord 
+                                       of InPlay -> go nb ns
+                                          X_Win -> print "X Wins!" -- print is repetitious
+                                          O_Win -> print "O Wins!" -- refactor w/ assoc list
+                                          Tie -> print "Tie Game!"
+                             else do print "invalid move, try an empty cell"
+                                     print b
+                                     go b stone
+                  else print "exiting"
 
 -- ******************************************************************
 
