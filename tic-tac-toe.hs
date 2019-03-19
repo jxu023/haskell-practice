@@ -26,7 +26,7 @@ showBoard (Board b) =
 
 -- ******************************************************************
 
-data GameStateResult = X_Win | O_Win | Tie | InPlay
+data GameStateResult = X_Win | O_Win | Tie | InPlay | InvalidMove
 
 gameState :: Board -> Coord -> GameStateResult
 gameState (Board b) coord 
@@ -82,6 +82,21 @@ validMove (Board b) c = b ! c == '_'
 
 -- ******************************************************************
 
+-- .. converting everything to just a big  case statement ... that's basically like the same as a
+-- c switch statement? ... kind of ? not really?
+-- the cases should be at different "levels"
+-- you could put them as all the same level .. but the function manipulating it should be at diff levels
+-- only produce one certain condition from one certain founction
+-- how do you reflect this in the definition though?
+
+
+-- i think i kind of get it ...
+-- maybe monad is useful for this 
+-- but the way i am thinking here is a big switch table
+-- 
+-- the print thing .. don't need an assoc list specifically
+-- just opverride the show instance for you GameResultType
+
 main = do
   print emptyBoard
   go emptyBoard 'X'
@@ -99,9 +114,9 @@ main = do
                                           X_Win -> print "X Wins!" -- print is repetitious
                                           O_Win -> print "O Wins!" -- refactor w/ assoc list
                                           Tie -> print "Tie Game!"
-                             else do print "invalid move, try an empty cell"
-                                     print b
-                                     go b stone
+                                          InvalidMove -> do print "invalid move, try an empty cell"
+                                                            print b
+                                                            go b stone
                   else print "exiting"
 
 -- ******************************************************************
