@@ -69,6 +69,8 @@ c21 (x, y) = x*3 + y + 1
 -- ******************************************************************
 
 -- monad?
+-- refactor w/o Either? https://www.reddit.com/r/haskell/comments/68upwd/how_to_easily_combine_types/
+-- please improve your commit messages ... they're awful!
 
 main = do
   let emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
