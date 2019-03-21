@@ -47,7 +47,7 @@ gameState (InPlay (Board b) stone) coord
   | not validMove = Right (InPlay (Board b) stone)
   | winner        = if stone == 'X' then Left X_Win else Left O_Win
   | tie           = Left Tie
-  | otherwise     = Right (InPlay nextBoard nextStone)
+  | otherwise     = Right (InPlay nextBoard (nextStone stone))
   where winner = any (== 2) $ map (\dir@(x, y) -> sum $ map count
                                                             [((-1)*x, (-1)*y), dir])
                                   [(0, 1), (1, 1), (1, 0), (1, -1)]
@@ -61,7 +61,9 @@ gameState (InPlay (Board b) stone) coord
         val x = x >= 0 && x < 3
         tie = all (/= '_') [b ! cell | cell <- allCoords]
         nextBoard = Board (b // [(coord, stone)])
-        nextStone = if stone == 'X' then 'O' else 'X'
+
+nextStone :: Stone -> Stone
+nextStone stone = if stone == 'X' then 'O' else 'X'
 
 -- ******************************************************************
 
@@ -82,12 +84,14 @@ c21 (x, y) = x*3 + y + 1
 solve :: GameState -> EndState
 solve (Left end) = end
 solve (Right ip@(InPlay (Board b) s))
-  | tie = Tie
   | xwin = X_Win
-  | otherwise = O_Win
+  | owin = O_Win
+  | otherwise = Tie
   where tie = all (== Tie) nextStates
-        xwin = s == 'X' && any (== X_Win) nextStates
-               || s == 'O' && all (== X_Win) nextStates
+        xwin = swin 'X' X_Win
+        owin = swin 'O' O_Win
+        swin st win = s == st && all (== win) nextStates
+                      || s == nextStone st && all (== win) nextStates
         nextStates = map solve [gameState ip coord | coord <- validCoords]
         validCoords = [coord | coord <- allCoords, b ! coord == '_']
 
@@ -100,6 +104,9 @@ readBoard :: [String] -> Board
 readBoard rows = Board $ array ((0,0), (2,2)) (go 1 (concat rows))
   where go count [] = []
         go count (x:xs) = (c12 count, x):(go (count + 1) xs)
+
+readState :: String -> GameState
+readState = undefined
 
 -- also add readInPlay, takes in the current stone as well
 -- the real definition of read should just be string
@@ -114,6 +121,6 @@ main = do
                   then case gameState playState (c12 (digitToInt c))
                           of Right nextPlay -> do print nextPlay
                                                   go nextPlay
-                             Left endState  -> print endState
+                             Left endState  -> print endState -- should also print final board, need to edit GameState
                   else do print playState
                           print "exiting"
