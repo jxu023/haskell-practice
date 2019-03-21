@@ -74,10 +74,6 @@ c21 (x, y) = x*3 + y + 1
 
 -- ******************************************************************
 
--- first need to debug solve for correctness .. clearly O doesn't always win
--- it should be tie for emptyBoard
--- write a testcase for it using readBoard
-
 -- this needs to cache game states to be efficient
 -- that means storing and doing a lookup
 -- best if we could eliminate symmetrically equivalent states
@@ -100,18 +96,30 @@ solve (Right ip@(InPlay (Board b) s))
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
 initialState = Right (InPlay emptyBoard 'X')
 
-readBoard :: [String] -> Board
-readBoard rows = Board $ array ((0,0), (2,2)) (go 1 (concat rows))
+-- ******************************************************************
+
+xwins1 = "OXO\
+         \XX_\
+         \O__"
+
+-- ******************************************************************
+readBoard :: String -> Board
+readBoard rows = Board $ array ((0,0), (2,2)) (go 1 rows)
   where go count [] = []
         go count (x:xs) = (c12 count, x):(go (count + 1) xs)
 
 readState :: String -> GameState
-readState = undefined
+readState str = Right (InPlay (readBoard (init str)) (last str))
+
+readAndSolve :: String -> EndState
+readAndSolve = solve . readState
 
 -- also add readInPlay, takes in the current stone as well
 -- the real definition of read should just be string
 
-main = do
+-- ******************************************************************
+
+playGame = do
   print emptyBoard
   go (InPlay emptyBoard 'X')
   where go playState
@@ -122,5 +130,12 @@ main = do
                           of Right nextPlay -> do print nextPlay
                                                   go nextPlay
                              Left endState  -> print endState -- should also print final board, need to edit GameState
+                                                              -- that way seems not as elegant as it is run now ... how to get the last board then?
                   else do print playState
                           print "exiting"
+
+-- ******************************************************************
+
+main = do
+    print "running some testcases"
+    readAndSolve xwins1
