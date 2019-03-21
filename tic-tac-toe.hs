@@ -1,8 +1,8 @@
 import Data.Array
 import Data.Char
 
-allCells :: (Num a, Enum a) => [(a, a)]
-allCells = [(i, j) | i <- [0..2], j <- [0..2]] -- refactor this to use bounds .. see 16
+allCoords :: (Num a, Enum a) => [(a, a)]
+allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
 
 -- ******************************************************************
 
@@ -26,7 +26,7 @@ showBoard (Board b) =
 
 -- ******************************************************************
 
-data EndState = X_Win | O_Win | Tie
+data EndState = X_Win | O_Win | Tie deriving (Eq)
 instance Show EndState where
     show X_Win = "X Wins!"
     show O_Win = "O Wins!"
@@ -36,8 +36,12 @@ data InPlay = InPlay Board Stone
 instance Show InPlay where
     show (InPlay b s) = show b
 
+-- refactor to (GameResult, BoardState), remove Either
+-- need this so can print out the final board
 type GameState = Either EndState InPlay
 
+-- consider change first input type to be GameState (?)
+-- makes for simpler initialization (in main (?))
 gameState :: InPlay -> Coord -> GameState
 gameState (InPlay (Board b) stone) coord
   | not validMove = Right (InPlay (Board b) stone)
@@ -55,7 +59,7 @@ gameState (InPlay (Board b) stone) coord
         validMove = valid coord && (b ! coord == '_')
         valid (x, y) = val x && val y
         val x = x >= 0 && x < 3
-        tie = all (/= '_') [b ! cell | cell <- allCells]
+        tie = all (/= '_') [b ! cell | cell <- allCoords]
         nextBoard = Board (b // [(coord, stone)])
         nextStone = if stone == 'X' then 'O' else 'X'
 
@@ -68,12 +72,39 @@ c21 (x, y) = x*3 + y + 1
 
 -- ******************************************************************
 
--- monad?
--- refactor w/o Either? https://www.reddit.com/r/haskell/comments/68upwd/how_to_easily_combine_types/
--- please improve your commit messages ... they're awful!
+-- first need to debug solve for correctness .. clearly O doesn't always win
+-- it should be tie for emptyBoard
+-- write a testcase for it using readBoard
+
+-- this needs to cache game states to be efficient
+-- that means storing and doing a lookup
+-- best if we could eliminate symmetrically equivalent states
+solve :: GameState -> EndState
+solve (Left end) = end
+solve (Right ip@(InPlay (Board b) s))
+  | tie = Tie
+  | xwin = X_Win
+  | otherwise = O_Win
+  where tie = all (== Tie) nextStates
+        xwin = s == 'X' && any (== X_Win) nextStates
+               || s == 'O' && all (== X_Win) nextStates
+        nextStates = map solve [gameState ip coord | coord <- validCoords]
+        validCoords = [coord | coord <- allCoords, b ! coord == '_']
+
+-- ******************************************************************
+
+emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
+initialState = Right (InPlay emptyBoard 'X')
+
+readBoard :: [String] -> Board
+readBoard rows = Board $ array ((0,0), (2,2)) (go 1 (concat rows))
+  where go count [] = []
+        go count (x:xs) = (c12 count, x):(go (count + 1) xs)
+
+-- also add readInPlay, takes in the current stone as well
+-- the real definition of read should just be string
 
 main = do
-  let emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCells]
   print emptyBoard
   go (InPlay emptyBoard 'X')
   where go playState
@@ -81,14 +112,8 @@ main = do
                putStrLn "\n"
                if c >= '1' && c <= '9'
                   then case gameState playState (c12 (digitToInt c))
-                          of Right nextPlay -> do print nextPlay -- a bit repetitious on prints again
-                                                  go nextPlay    -- derive Show on GameState?
+                          of Right nextPlay -> do print nextPlay
+                                                  go nextPlay
                              Left endState  -> print endState
                   else do print playState
                           print "exiting"
-
--- ******************************************************************
-
--- the way to make the code "maintainable" may be to map a name onto as much as possible
--- then it might make things really customizable / easy to change ..
--- divide the code into "grabbable" parts (e.g. names)
