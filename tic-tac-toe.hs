@@ -6,10 +6,10 @@ allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
 
 -- ******************************************************************
 
-type Stone = Char
+type Turn = Char
 type Coord = (Int, Int)
 
-newtype Board = Board (Array Coord Stone)
+newtype Board = Board (Array Coord Turn)
 
 instance Show Board where
     show = showBoard
@@ -27,12 +27,13 @@ showBoard (Board b) =
 -- ******************************************************************
 
 data EndState = X_Win | O_Win | Tie deriving (Eq)
+
 instance Show EndState where
     show X_Win = "X Wins!"
     show O_Win = "O Wins!"
     show Tie = "Tie Game!"
 
-data InPlay = InPlay Board Stone
+data InPlay = InPlay Board Turn
 instance Show InPlay where
     show (InPlay b s) = show b
 
@@ -43,27 +44,28 @@ type GameState = Either EndState InPlay
 -- consider change first input type to be GameState (?)
 -- makes for simpler initialization (in main (?))
 gameState :: InPlay -> Coord -> GameState
-gameState (InPlay (Board b) stone) coord
-  | not validMove = Right (InPlay (Board b) stone)
-  | winner        = if stone == 'X' then Left X_Win else Left O_Win
+gameState (InPlay (Board b) turn) coord
+  | not validMove = Right (InPlay (Board b) turn)
+  | winner        = if turn == 'X' then Left X_Win else Left O_Win
   | tie           = Left Tie
-  | otherwise     = Right (InPlay nextBoard (nextStone stone))
-  where winner = any (== 2) $ map (\dir@(x, y) -> sum $ map count
-                                                            [((-1)*x, (-1)*y), dir])
+  | otherwise     = Right (InPlay nextBoard (nextTurn turn))
+  where winner = any (== 2) $ map (\(x, y) -> sum $ map count
+                                                        [((-1)*x, (-1)*y), (x, y)])
                                   [(0, 1), (1, 1), (1, 0), (1, -1)]
         count diff = follow $ next coord
-          where follow crd = if valid crd && b ! crd == stone
+          where follow crd = if valid crd && b ! crd == turn
                                 then 1 + (follow (next crd))
                                 else 0
                 next (x, y) = (x + fst diff, y + snd diff)
         validMove = valid coord && (b ! coord == '_')
         valid (x, y) = val x && val y
         val x = x >= 0 && x < 3
-        tie = all (/= '_') [b ! cell | cell <- allCoords]
-        nextBoard = Board (b // [(coord, stone)])
+        tie = all (/= '_') [nextB ! cell | cell <- allCoords]
+        nextB = b // [(coord, turn)]
+        nextBoard = Board b
 
-nextStone :: Stone -> Stone
-nextStone stone = if stone == 'X' then 'O' else 'X'
+nextTurn :: Turn -> Turn
+nextTurn turn = if turn == 'X' then 'O' else 'X'
 
 -- ******************************************************************
 
@@ -83,13 +85,17 @@ solve (Right ip@(InPlay (Board b) s))
   | xwin = X_Win
   | owin = O_Win
   | otherwise = Tie
-  where tie = all (== Tie) nextStates
-        xwin = swin 'X' X_Win
+  where xwin = swin 'X' X_Win
         owin = swin 'O' O_Win
-        swin st win = s == st && all (== win) nextStates
-                      || s == nextStone st && all (== win) nextStates
-        nextStates = map solve [gameState ip coord | coord <- validCoords]
+        swin st win = s == st && any (== win) childrenEndStates
+                      || s == nextTurn st && all (== win) childrenEndStates
+        childrenEndStates = map solve [gameState ip coord | coord <- validCoords]
         validCoords = [coord | coord <- allCoords, b ! coord == '_']
+
+-- if don't use swin , then i can also define the xwin condition like this:
+
+-- (s == 'X' && any (== X_Win) nextStates)
+-- || (s == 'O' && all (== X_Win) nextStates)
 
 -- ******************************************************************
 
@@ -109,6 +115,8 @@ readAndSolve = solve . readState
 
 -- ******************************************************************
 
+-- should also print final board, need to edit GameState
+-- that way seems not as elegant as it is run now ... how to get the last board then?
 playGame = do
   print emptyBoard
   go (InPlay emptyBoard 'X')
@@ -119,8 +127,7 @@ playGame = do
                   then case gameState playState (c12 (digitToInt c))
                           of Right nextPlay -> do print nextPlay
                                                   go nextPlay
-                             Left endState  -> print endState -- should also print final board, need to edit GameState
-                                                              -- that way seems not as elegant as it is run now ... how to get the last board then?
+                             Left endState  -> print endState 
                   else do print playState
                           print "exiting"
 
@@ -133,10 +140,18 @@ initialState = Right (InPlay emptyBoard 'X')
 
 xwins1 = "OXO\
          \XX_\
-         \O__"
+         \O__O"
 
 -- ******************************************************************
+-- too much refactoring for incremental changes is a sign of having your functions
+-- operate on types which are at the wrong level
+-- if you find yourself unwrapping a variable by pattern matching ...
+-- then perhaps you should probably just use a separate function
 
+-- does the same thought apply for wrapping things?
+-- should define a convention to wrap things only where you use the wrapped thing
+
+-- verify input for readAndSolve ... seems board not right in prev test
 main = do
     print "running some testcases"
     print $ readAndSolve xwins1
