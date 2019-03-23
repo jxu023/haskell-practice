@@ -93,16 +93,6 @@ solve (Right ip@(InPlay (Board b) s))
 
 -- ******************************************************************
 
-emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
-initialState = Right (InPlay emptyBoard 'X')
-
--- ******************************************************************
-
-xwins1 = "OXO\
-         \XX_\
-         \O__"
-
--- ******************************************************************
 readBoard :: String -> Board
 readBoard rows = Board $ array ((0,0), (2,2)) (go 1 rows)
   where go count [] = []
@@ -136,6 +126,17 @@ playGame = do
 
 -- ******************************************************************
 
+emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
+initialState = Right (InPlay emptyBoard 'X')
+
+-- ******************************************************************
+
+xwins1 = "OXO\
+         \XX_\
+         \O__"
+
+-- ******************************************************************
+
 main = do
     print "running some testcases"
-    readAndSolve xwins1
+    print $ readAndSolve xwins1
