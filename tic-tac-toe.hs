@@ -1,10 +1,19 @@
 import Data.Array
 import Data.Char
+-- import Debug.Trace (trace) .. what was notation for this?
+-- import the specific functions used, not the whole module
 
 allCoords :: (Num a, Enum a) => [(a, a)]
 allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
+-- refactor to use bounds? would need another param then
 
 -- ******************************************************************
+-- types denote computation ...
+-- avoid higher level types until u see the pattern to factor out ..
+-- then it becomes one for the toolbox
+-- they should really define these things by solvable problems
+-- i guess error handling is okay, but it really means control flow in general doesn't it
+-- for monad?
 
 type Turn = Char
 type Coord = (Int, Int)
@@ -14,15 +23,17 @@ newtype Board = Board (Array Coord Turn)
 instance Show Board where
     show = showBoard
 
+showCell :: Array Coord Turn -> Coord -> Char
+showCell arr coord
+  | cell == '_' = intToDigit (c21 coord)
+  | otherwise   = cell
+  where cell = arr ! coord
+
+-- map, list monad, or list comprehension ..
 showBoard :: Board -> String
 showBoard (Board b) =
-    unlines (map (\r -> concat $ map (\c -> [' ', coordF b (r, c)])
-                                     [sc..ec]) [sr..er])
-    where ((sr, sc), (er, ec)) = bounds b -- s - start, r - row, e - end, c - col
-          coordF b c = let v = b ! c
-                         in if v == '_'
-                              then intToDigit (c21 c)
-                              else v
+    unlines [concat [[' ', showCell b (r, c)] | c <- [sc..ec]] | r <- [sr..er]]
+    where ((sr, sc), (er, ec)) = bounds b
 
 -- ******************************************************************
 
@@ -37,9 +48,8 @@ data InPlay = InPlay Board Turn
 instance Show InPlay where
     show (InPlay b s) = show b
 
--- refactor to (GameResult, BoardState), remove Either
--- need this so can print out the final board
 type GameState = Either EndState InPlay
+
 
 -- consider change first input type to be GameState (?)
 -- makes for simpler initialization (in main (?))
@@ -60,9 +70,9 @@ gameState (InPlay (Board b) turn) coord
         validMove = valid coord && (b ! coord == '_')
         valid (x, y) = val x && val y
         val x = x >= 0 && x < 3
-        tie = all (/= '_') [nextB ! cell | cell <- allCoords]
+        tie = all (/= '_') [nextB ! cell | cell <- allCoords] -- was b instead of nextB ... should write a test for this somehow?
         nextB = b // [(coord, turn)]
-        nextBoard = Board b
+        nextBoard = Board nextB
 
 nextTurn :: Turn -> Turn
 nextTurn turn = if turn == 'X' then 'O' else 'X'
