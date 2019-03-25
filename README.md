@@ -12,4 +12,6 @@ plans include
 and might as well learn some markdown while i'm at it...
 
 https://en.wikibooks.org/wiki/Haskell
+
+
 https://stackoverflow.com/questions/22342854/what-is-the-optimal-algorithm-for-the-game-2048
