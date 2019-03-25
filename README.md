@@ -15,3 +15,5 @@ https://en.wikibooks.org/wiki/Haskell
 
 
 https://stackoverflow.com/questions/22342854/what-is-the-optimal-algorithm-for-the-game-2048
+
+maybe we can even get to HLearn at some point.
