@@ -199,6 +199,9 @@ tie1   = "___\
 
 -- refactor to list comprehensions .. is that better?
 
+-- need to change the type of gamestate from Either a b to (MetaData, BoardState)
+-- something like that ... what else to call it but metadata?
+
 main = do
     print "running some testcases"
     print $ readAndSolve xwins1
