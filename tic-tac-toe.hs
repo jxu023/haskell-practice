@@ -29,7 +29,6 @@ showCell arr coord
   | otherwise   = cell
   where cell = arr ! coord
 
--- map, list monad, or list comprehension ..
 showBoard :: Board -> String
 showBoard (Board b) =
     unlines [concat [[' ', showCell b (r, c)] | c <- [sc..ec]] | r <- [sr..er]]
@@ -37,12 +36,13 @@ showBoard (Board b) =
 
 -- ******************************************************************
 
-data EndState = X_Win | O_Win | Tie deriving (Eq)
+data EndState = X_Win | O_Win | Tie | InvalidBoard deriving (Eq)
 
 instance Show EndState where
     show X_Win = "X Wins!"
     show O_Win = "O Wins!"
     show Tie = "Tie Game!"
+    show InvalidBoard = "Board is invalid!"
 
 data InPlay = InPlay Board Turn
 instance Show InPlay where
@@ -114,14 +114,42 @@ readBoard rows = Board $ array ((0,0), (2,2)) (go 1 rows)
   where go count [] = []
         go count (x:xs) = (c12 count, x):(go (count + 1) xs)
 
-readState :: String -> GameState
-readState str = Right (InPlay (readBoard (init str)) (last str))
+-- use monad notation since Maybe is a monad?
+readState :: Maybe String -> GameState
+readState (Just str) = Right (InPlay (readBoard (init str)) (last str))
+readState Nothing = Left InvalidBoard
+
+-- this could probably look nicer somehow?
+-- apply and to a list of conditions instead of repetiously using &&
+-- naming these conditions seems ... not so good
+-- there has to be a better way
+-- debug this error -_-
+-- how about ... construct steps for simultaneous counting
+-- invalid along the way ... use the monad notation
+-- probably will look much better than this ..
+-- error checking stuff is the specific use case for maybe monad after all...
+verifyInputString :: String -> Maybe String
+verifyInputString str = if valid then Just str else Nothing
+                        where valid = totalCount == 10
+                                      && noOtherCount
+                                      && (xTurn || oTurn)
+                                      && (xTurn && (oCount == xCount)
+                                          || oTurn && (oCount - 1 == xCount))
+  -- is there someway to generate counts simultaneously?
+                              totalCount = length str
+                              noOtherCount = null $ filter (\c -> and $ map (/= c) ['X', 'O', '_']) board
+                              xCount = length [c | c <- board, c == 'X']
+                              oCount = length [c | c <- board, c == 'O']
+                              board = init str
+                              turn = last str
+                              xTurn = turn == 'X'
+                              oTurn = turn == 'O'
 
 readAndSolve :: String -> EndState
-readAndSolve = solve . readState
+readAndSolve = solve . readState . verifyInputString
 
--- also add readInPlay, takes in the current stone as well
--- the real definition of read should just be string
+-- x to move then equal num stones
+--
 
 -- ******************************************************************
 
@@ -152,6 +180,10 @@ xwins1 = "OXO\
          \XX_\
          \O__O"
 
+tie1   = "___\
+         \OO_\
+         \___X"
+
 -- ******************************************************************
 -- too much refactoring for incremental changes is a sign of having your functions
 -- operate on types which are at the wrong level
@@ -162,6 +194,12 @@ xwins1 = "OXO\
 -- should define a convention to wrap things only where you use the wrapped thing
 
 -- verify input for readAndSolve ... seems board not right in prev test
+
+-- store optimal sequence(s) of moves leading to solved result
+
+-- refactor to list comprehensions .. is that better?
+
 main = do
     print "running some testcases"
     print $ readAndSolve xwins1
+    print $ readAndSolve tie1
