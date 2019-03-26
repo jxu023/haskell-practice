@@ -1,6 +1,6 @@
 import Data.Array
 import Data.Char
--- import Debug.Trace (trace) .. what was notation for this?
+-- import Debug.Trace
 -- import the specific functions used, not the whole module
 
 allCoords :: (Num a, Enum a) => [(a, a)]
@@ -120,30 +120,25 @@ readState (Just str) = Right (InPlay (readBoard (init str)) (last str))
 readState Nothing = Left InvalidBoard
 
 -- this could probably look nicer somehow?
--- apply and to a list of conditions instead of repetiously using &&
--- naming these conditions seems ... not so good
--- there has to be a better way
--- debug this error -_-
--- how about ... construct steps for simultaneous counting
--- invalid along the way ... use the monad notation
--- probably will look much better than this ..
--- error checking stuff is the specific use case for maybe monad after all...
+-- i should be able to notify the reason for bad input
+-- each one should be accompanied by a message
+-- that would be a reason to use Either
 verifyInputString :: String -> Maybe String
-verifyInputString str = if valid then Just str else Nothing
-                        where valid = totalCount == 10
-                                      && noOtherCount
-                                      && (xTurn || oTurn)
-                                      && (xTurn && (oCount == xCount)
-                                          || oTurn && (oCount - 1 == xCount))
-  -- is there someway to generate counts simultaneously?
-                              totalCount = length str
-                              noOtherCount = null $ filter (\c -> and $ map (/= c) ['X', 'O', '_']) board
-                              xCount = length [c | c <- board, c == 'X']
-                              oCount = length [c | c <- board, c == 'O']
-                              board = init str
-                              turn = last str
-                              xTurn = turn == 'X'
-                              oTurn = turn == 'O'
+verifyInputString str
+  = if valid then Just str else Nothing
+    where valid = and [totalCount == 10,
+                       noOtherCount,
+                       xTurn || oTurn,
+                       xTurn && (oCount == xCount)
+                          || oTurn && (oCount - 1 == xCount)]
+          totalCount = length str
+          noOtherCount = null $ filter (\c -> and $ map (/= c) ['X', 'O', '_']) str
+          xCount = length [c | c <- board, c == 'X']
+          oCount = length [c | c <- board, c == 'O']
+          xTurn = turn == 'X'
+          oTurn = turn == 'O'
+          board = init str
+          turn = last str
 
 readAndSolve :: String -> EndState
 readAndSolve = solve . readState . verifyInputString
@@ -181,7 +176,7 @@ xwins1 = "OXO\
          \O__O"
 
 tie1   = "___\
-         \OO_\
+         \O__\
          \___X"
 
 -- ******************************************************************
