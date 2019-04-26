@@ -1,4 +1,6 @@
 
+types represent computation
+
 tic tac toe > min max > 5 in a row > monte carlo > go > mind ninja
     perhaps add some probability stuff at some point
     try HLearn

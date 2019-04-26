@@ -1,19 +1,8 @@
 import Data.Array
 import Data.Char
--- import Debug.Trace
--- import the specific functions used, not the whole module
 
 allCoords :: (Num a, Enum a) => [(a, a)]
 allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
--- refactor to use bounds? would need another param then
-
--- ******************************************************************
--- types denote computation ...
--- avoid higher level types until u see the pattern to factor out ..
--- then it becomes one for the toolbox
--- they should really define these things by solvable problems
--- i guess error handling is okay, but it really means control flow in general doesn't it
--- for monad?
 
 type Turn = Char
 type Coord = (Int, Int)
@@ -34,8 +23,6 @@ showBoard (Board b) =
     unlines [concat [[' ', showCell b (r, c)] | c <- [sc..ec]] | r <- [sr..er]]
     where ((sr, sc), (er, ec)) = bounds b
 
--- ******************************************************************
-
 data EndState = X_Win | O_Win | Tie | InvalidBoard deriving (Eq)
 
 instance Show EndState where
@@ -50,9 +37,6 @@ instance Show InPlay where
 
 type GameState = Either EndState InPlay
 
-
--- consider change first input type to be GameState (?)
--- makes for simpler initialization (in main (?))
 gameState :: InPlay -> Coord -> GameState
 gameState (InPlay (Board b) turn) coord
   | not validMove = Right (InPlay (Board b) turn)
@@ -70,25 +54,18 @@ gameState (InPlay (Board b) turn) coord
         validMove = valid coord && (b ! coord == '_')
         valid (x, y) = val x && val y
         val x = x >= 0 && x < 3
-        tie = all (/= '_') [nextB ! cell | cell <- allCoords] -- was b instead of nextB ... should write a test for this somehow?
+        tie = all (/= '_') [nextB ! cell | cell <- allCoords]
         nextB = b // [(coord, turn)]
         nextBoard = Board nextB
 
 nextTurn :: Turn -> Turn
 nextTurn turn = if turn == 'X' then 'O' else 'X'
 
--- ******************************************************************
-
 c12 :: Int -> (Int, Int)
 c12 y = (div x 3, mod x 3) where x = y-1
 c21 :: (Int,Int) -> Int
 c21 (x, y) = x*3 + y + 1
 
--- ******************************************************************
-
--- this needs to cache game states to be efficient
--- that means storing and doing a lookup
--- best if we could eliminate symmetrically equivalent states
 solve :: GameState -> EndState
 solve (Left end) = end
 solve (Right ip@(InPlay (Board b) s))
@@ -102,27 +79,15 @@ solve (Right ip@(InPlay (Board b) s))
         childrenEndStates = map solve [gameState ip coord | coord <- validCoords]
         validCoords = [coord | coord <- allCoords, b ! coord == '_']
 
--- if don't use swin , then i can also define the xwin condition like this:
-
--- (s == 'X' && any (== X_Win) nextStates)
--- || (s == 'O' && all (== X_Win) nextStates)
-
--- ******************************************************************
-
 readBoard :: String -> Board
 readBoard rows = Board $ array ((0,0), (2,2)) (go 1 rows)
   where go count [] = []
         go count (x:xs) = (c12 count, x):(go (count + 1) xs)
 
--- use monad notation since Maybe is a monad?
 readState :: Maybe String -> GameState
 readState (Just str) = Right (InPlay (readBoard (init str)) (last str))
 readState Nothing = Left InvalidBoard
 
--- this could probably look nicer somehow?
--- i should be able to notify the reason for bad input
--- each one should be accompanied by a message
--- that would be a reason to use Either
 verifyInputString :: String -> Maybe String
 verifyInputString str
   = if valid then Just str else Nothing
@@ -143,13 +108,6 @@ verifyInputString str
 readAndSolve :: String -> EndState
 readAndSolve = solve . readState . verifyInputString
 
--- x to move then equal num stones
---
-
--- ******************************************************************
-
--- should also print final board, need to edit GameState
--- that way seems not as elegant as it is run now ... how to get the last board then?
 playGame = do
   print emptyBoard
   go (InPlay emptyBoard 'X')
@@ -164,12 +122,8 @@ playGame = do
                   else do print playState
                           print "exiting"
 
--- ******************************************************************
-
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
 initialState = Right (InPlay emptyBoard 'X')
-
--- ******************************************************************
 
 xwins1 = "OXO\
          \XX_\
@@ -178,24 +132,6 @@ xwins1 = "OXO\
 tie1   = "___\
          \O__\
          \___X"
-
--- ******************************************************************
--- too much refactoring for incremental changes is a sign of having your functions
--- operate on types which are at the wrong level
--- if you find yourself unwrapping a variable by pattern matching ...
--- then perhaps you should probably just use a separate function
-
--- does the same thought apply for wrapping things?
--- should define a convention to wrap things only where you use the wrapped thing
-
--- verify input for readAndSolve ... seems board not right in prev test
-
--- store optimal sequence(s) of moves leading to solved result
-
--- refactor to list comprehensions .. is that better?
-
--- need to change the type of gamestate from Either a b to (MetaData, BoardState)
--- something like that ... what else to call it but metadata?
 
 main = do
     print "running some testcases"
