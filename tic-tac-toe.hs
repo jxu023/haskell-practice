@@ -1,8 +1,10 @@
 import Data.Array
 import Data.Char
 
-allCoords :: (Num a, Enum a) => [(a, a)]
-allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
+c12 :: Int -> (Int, Int)
+c12 y = (div x 3, mod x 3) where x = y-1
+c21 :: (Int,Int) -> Int
+c21 (x, y) = x*3 + y + 1
 
 type Turn = Char
 type Coord = (Int, Int)
@@ -37,6 +39,9 @@ instance Show InPlay where
 
 type GameState = Either EndState InPlay
 
+allCoords :: (Num a, Enum a) => [(a, a)]
+allCoords = [(i, j) | i <- [0..2], j <- [0..2]]
+
 gameState :: InPlay -> Coord -> GameState
 gameState (InPlay (Board b) turn) coord
   | not validMove = Right (InPlay (Board b) turn)
@@ -60,11 +65,6 @@ gameState (InPlay (Board b) turn) coord
 
 nextTurn :: Turn -> Turn
 nextTurn turn = if turn == 'X' then 'O' else 'X'
-
-c12 :: Int -> (Int, Int)
-c12 y = (div x 3, mod x 3) where x = y-1
-c21 :: (Int,Int) -> Int
-c21 (x, y) = x*3 + y + 1
 
 solve :: GameState -> EndState
 solve (Left end) = end
@@ -125,15 +125,12 @@ playGame = do
 emptyBoard = Board $ array ((0,0), (2,2)) [(coord, '_') | coord <- allCoords]
 initialState = Right (InPlay emptyBoard 'X')
 
-xwins1 = "OXO\
-         \XX_\
-         \O__O"
-
-tie1   = "___\
-         \O__\
-         \___X"
+testCases = [("OXO\
+              \XX_\
+              \O__O", X_Win),
+             ("___\
+              \O__\
+              \___X", Tie),]
 
 main = do
-    print "running some testcases"
-    print $ readAndSolve xwins1
-    print $ readAndSolve tie1
+    print "Let's play some TicTacToe."

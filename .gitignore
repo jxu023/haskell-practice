@@ -2,3 +2,5 @@ tic-tac-toe.hi
 tic-tac-toe.o
 tmp
 main
+a
+*.swp
