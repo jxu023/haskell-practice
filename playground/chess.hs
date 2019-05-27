@@ -22,7 +22,7 @@ instance Show ChessCell where
                                    Pawn -> "♟"
                                    Rook -> "♜"
                                    Knight -> "♞"
-                                   Bishop -> "♗"
+                                   Bishop -> "♝"
                                    King -> "♚"
                                    Queen -> "♛"
 
@@ -43,9 +43,9 @@ instance Show ChessBoard where
 
 chessBoard lst = ChessBoard $ array ((0, 0), (7, 7)) lst
 
-b = chessBoard [((i, j), Piece Black Knight) | i <- [0..7], j <- [0..7]]
+initial_board = chessBoard [((i, j), Piece Black Knight) | i <- [0..7], j <- [0..7]]
 
 -- TODO add support to read chess notation, and store games
 main = do
-        putStr . show $ b
+        putStr . show $ initial_board
 
