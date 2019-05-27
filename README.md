@@ -1,6 +1,5 @@
 # haskell-practice
-see notes ..
-plans include
+gonna just write whatever, following are ideas..
 * tic tac toe
 * 5 in a row
 * go
@@ -8,6 +7,8 @@ plans include
 * mind ninja (builder vs blocker)
 * 2048
 * expectimax
+* chess
+* go
 
 and might as well learn some markdown while i'm at it...
 
