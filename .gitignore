@@ -1,5 +1,5 @@
-tic-tac-toe.hi
-tic-tac-toe.o
+*.hi
+*.o
 tmp
 main
 a

@@ -1,10 +1,6 @@
 
--- given a 2d matrix of Int, 0 - water, 1 - land
--- return the max height possible given these rules
---
--- assign max possible height
--- water must be 0
--- all cells must be w/in diff 1 height of ea other
+-- sealevel is 0
+-- max ht diff 1 btwn neighs
 
 import Data.Array
 -- import Debug.Trace
@@ -29,8 +25,6 @@ list2arr lst = array ((0, 0), (m, n)) (fill 0 0 lst)
               fill i j ([]:rows)     = fill (i + 1) 0 rows
               fill _ _ []            = []
 
--- bfs recursive definition in terms of levels
-        -- initialize base level of 0 with sea squares
 -- mark array cells as 0 to indicate visited
 maxHeight :: Arr -> Int
 maxHeight = bfs . sea_level
@@ -42,12 +36,12 @@ maxHeight = bfs . sea_level
                       where next' = adj x ++ next
                             visited = zip (adj x) (repeat 0)
                             adj (i,j) = filter valid [(i + di, j + dj) | (di, dj) <- [(-1, 0), (1, 0), (0, 1), (0, -1)]]
-                            valid :: Coord -> Bool
                             valid x' = and [op (dim x') (dim lim) | dim       <- [fst, snd],
                                                                     (op, lim) <- [((>=), fst bnd), ((<=), snd bnd)]]
                                        && arr ! x' > 0
                             bnd = bounds arr
 
+-- try printing out that intermediate array .. use trace
 main = do
         print . show . maxHeight $ list2arr mat1
         print "hi"
