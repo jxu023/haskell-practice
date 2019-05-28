@@ -1,5 +1,6 @@
 import Data.Array
 import Data.Char
+import Debug.Trace
 
 type Coord = (Int, Int)
 
@@ -40,7 +41,7 @@ outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
 -- returns a list of valid moves
--- TODO need representation for castling move
+-- TODO en passant, castling, needs more game context
 moves (ChessBoard board) src@(r, c) =
         let dest (dr, dc) = (r + dr, c + dc)
             piecep coord = (inBounds coord &&) $ case (board ! coord) of Piece _ _ -> True
@@ -142,6 +143,15 @@ starting_board
 --      or use code folding and save those into a session
 --     
 
-main = do
+-- TODO convert coordinates between (Int, Int) and String
+queryMoveLoop = do
         putStr . show $ starting_board
+        putStr "moves for src: "
+        line <- getLine
+        let r = 8 - (ord (line !! 1) - (ord '0'))
+            c = ord (line !! 0) - (ord 'a')
+        trace (show r ++ " " ++ show c ++ "\n") $ print $ moves starting_board (r, c)
+        _ <- getChar
+        queryMoveLoop
 
+main = queryMoveLoop
