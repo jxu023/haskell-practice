@@ -36,30 +36,54 @@ instance Show ChessCell where
                                    King -> "♚"
                                    Queen -> "♛"
 
+outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
+inBounds = not . outBounds
+
+-- returns a list of valid moves
+-- TODO need representation for castling move
 moves (ChessBoard board) src@(r, c) =
         let dest (dr, dc) = (r + dr, c + dc)
-            sameColor dst = case board ! src of
-                                 Piece colorS _ -> case board ! dst of
-                                                        Piece colorD _ ->
-                                                                colorS == colorD
-                                                        _ -> False
-                                 _ -> False
-            pawnFwd = undefined
-            pawnTake = undefined -- checks for Enpassant and offending piece color to take
+            piecep coord = (inBounds coord &&) $ case (board ! coord) of Piece _ _ -> True
+                                                                         _ -> False
+            whitep coord = matchWhite $ board ! coord
+                where matchWhite (Piece color _) = color == White
+            sameColor dst = piecep src && piecep dst && whitep src == whitep dst
+            diffColor dst = piecep dst && piecep src && not (sameColor dst)
+            emptyp = not . piecep
+            hindrowp coord@(r, c) = r == 1 && whitep coord || r == 6 && (not $ whitep coord)
 
-            -- dirs serving as input to extend
+            -- unless blocked, can move 1 fwd and move 2 fwd if on starting row
+            pawnFwd dir = let dst = dest dir
+                              dst2 = dest dst
+                          in if emptyp dst
+                                then ([dst] ++) $ if emptyp dst2 && hindrowp src
+                                                   then [dst2] else []
+                                else []
+            -- checks opp piece colors and EnPassant in dest
+            pawnTake dirs = dirs >>= \dir ->
+                let dst = dest dir
+                in if diffColor dst then [dst] else []
+
+            -- dirs for input to extend
             horiz = [(0, 1), (0, -1)]
             vert = [(1, 0), (-1, 0)]
-            diag = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
+            diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
             eightDirs = concat [horiz, vert, diag]
+            ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
             -- move/take cells pointed by dir within dist, blocked by sameColor
             extend distance dirs = dirs >>= go distance
-                    where go dist dir | dist == 0 || sameColor (dest dir) = []
-                                      | otherwise = (dest dir):(go (dist - 1) dir)
+                    where go dist dir | dist == 0
+                                        || outBounds dst
+                                        || sameColor dst = []
+                                      | otherwise = dst:(go (dist - 1) dir)
+                                      where dst = dest dir
 
-            ljump = undefined
+            -- king and castle must never moved before and cells between them are empty
+            -- for both kinds of castles
+            -- should just mark a boolean flag when either have moved inside the ChessGame state
             castle = undefined
 
+        -- TODO apply filter to list if the king is in check such that next moves must avoid check
         in case board ! src of 
                 Empty -> []
                 Piece color role -> case role of
@@ -71,7 +95,7 @@ moves (ChessBoard board) src@(r, c) =
                         Rook -> extend 8 (horiz ++ vert)
                         Knight -> extend 1 ljump
                         Bishop -> extend 8 diag
-                        King -> extend 1 eightDirs ++ castle
+                        King -> extend 1 eightDirs -- ++ castle -- TODO define castle
                         Queen -> extend 8 eightDirs
 
 data ChessBoard = ChessBoard (Array Coord ChessCell)
@@ -90,6 +114,7 @@ instance Show ChessBoard where
 
 chessBoard lst = ChessBoard $ array ((0, 0), (7, 7)) lst
 
+-- construct the starting board position
 pawn_row = take 8 $ repeat Pawn
 hind_row = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
 empty_row = take 8 $ repeat Empty
