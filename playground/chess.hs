@@ -41,29 +41,33 @@ outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
 -- returns a list of valid moves
--- TODO en passant, castling, needs more game context
-moves (ChessBoard board) src@(r, c) =
-        let dest (dr, dc) = (r + dr, c + dc)
-            piecep coord = (inBounds coord &&) $ case (board ! coord) of Piece _ _ -> True
-                                                                         _ -> False
+-- TODO en passant, castling, check limited, needs more game context
+moves (ChessBoard board) src =
+            -- convenient predicates
+        let piecep coord = (inBounds coord &&) $
+                case (board ! coord) of Piece _ _ -> True
+                                        _ -> False
             whitep coord = matchWhite $ board ! coord
                 where matchWhite (Piece color _) = color == White
             sameColor dst = piecep src && piecep dst && whitep src == whitep dst
             diffColor dst = piecep dst && piecep src && not (sameColor dst)
             emptyp = not . piecep
-            hindrowp coord@(r, c) = r == 1 && whitep coord || r == 6 && (not $ whitep coord)
+            hindrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
+
+            -- adds a delta to some coordinate
+            dest (r, c) (dr, dc) = (r + dr, c + dc)
 
             -- unless blocked, can move 1 fwd and move 2 fwd if on starting row
-            pawnFwd dir = let dst = dest dir
-                              dst2 = dest dst
-                          in if emptyp dst
-                                then ([dst] ++) $ if emptyp dst2 && hindrowp src
-                                                   then [dst2] else []
+            pawnFwd dir = let dst = dest src dir
+                              dst2 = dest dst dir
+                          in if inBounds dst && emptyp dst
+                                then ([dst] ++) $ if inBounds dst2 && emptyp dst2 && hindrowp src
+                                                     then [dst2] else []
                                 else []
             -- checks opp piece colors and EnPassant in dest
             pawnTake dirs = dirs >>= \dir ->
-                let dst = dest dir
-                in if diffColor dst then [dst] else []
+                let dst = dest src dir
+                in if inBounds dst && diffColor dst then [dst] else []
 
             -- dirs for input to extend
             horiz = [(0, 1), (0, -1)]
@@ -77,8 +81,8 @@ moves (ChessBoard board) src@(r, c) =
                                         || outBounds dst
                                         || sameColor dst = []
                                       | otherwise = dst:(go (dist - 1) dir)
-                                      where dst = dest dir
-
+                                      where dst = dest src dir
+ 
             -- king and castle must never moved before and cells between them are empty
             -- for both kinds of castles
             -- should just mark a boolean flag when either have moved inside the ChessGame state
@@ -143,15 +147,16 @@ starting_board
 --      or use code folding and save those into a session
 --     
 
--- TODO convert coordinates between (Int, Int) and String
+coords :: [(Int, Int)] -> [String]
+coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
+
 queryMoveLoop = do
         putStr . show $ starting_board
         putStr "moves for src: "
         line <- getLine
         let r = 8 - (ord (line !! 1) - (ord '0'))
             c = ord (line !! 0) - (ord 'a')
-        trace (show r ++ " " ++ show c ++ "\n") $ print $ moves starting_board (r, c)
-        _ <- getChar
+        print . coords $ moves starting_board (r, c)
         queryMoveLoop
 
 main = queryMoveLoop
