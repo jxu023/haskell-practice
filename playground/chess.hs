@@ -41,11 +41,13 @@ data ChessState = ChessState {refBoard :: Array Coord ChessCell,
                               refCastleWhiteKside :: Bool,
                               refCastleWhiteQside :: Bool,
                               refCastleBlackKside :: Bool,
-                              refCastleBlackQside :: Bool}
+                              refCastleBlackQside :: Bool,
+                              refTurn :: Color}
 
 -- TODO look into ben lynn's haskell js gui thing
+-- TODO show "white to move or black to move"
 instance Show ChessState where
-        show (ChessState b _ _ _ _ _)
+        show (ChessState b _ _ _ _ _ _)
                 = let ((br, bc), (er, ec)) = bounds b
                       colCoords = (\x -> "  " ++ x ++ "\n") $
                         concat [ [chr $ c + ord 'a', ' '] | c <- [bc..ec]]
@@ -63,7 +65,7 @@ at board coord | inBounds coord = board ! coord
                | otherwise      = OutOfBounds
 
 -- returns a list of valid moves
-moves (ChessState board passant castleWK castleWQ castleBK castleBQ) src =
+moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
         let -- convenient predicates
             -- TODO reduce duplicatation below ... template haskell?
             piecep coord = case at board coord of Piece _ _ -> True
@@ -120,7 +122,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ) src =
 
         -- TODO apply filter to list if the king is in check such that next moves must avoid check
         in case at board src of 
-                Piece color role -> case role of
+                Piece color role -> if color /= turn then [] else case role of
                         Pawn -> case color of
                                 Black -> pawnFwd (1, 0)
                                          ++ pawnTake [(-1, -1), (-1, 1)]
@@ -133,7 +135,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ) src =
                         Queen -> extend 8 eightDirs
                 _ -> []
 
-chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True
+chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White
 
 -- construct the starting board position
 pawn_row = take 8 $ repeat Pawn
@@ -154,8 +156,6 @@ starting_board
                        (concat starting_position)
 
 -- TODO read games using algebraic notation
-
--- TODO use the list monad to enumerate possible board states
 
 -- TODO look at real world haskell examples to use Modules correctly
 --      then divide up your code into separate files.
