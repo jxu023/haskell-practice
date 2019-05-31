@@ -5,6 +5,9 @@ import Debug.Trace
 type Coord = (Int, Int)
 
 data Color = Black | White deriving (Eq)
+instance Show Color where
+    show Black = "Black"
+    show White = "White"
 
 data Role = Pawn | Rook | Knight | Bishop | King | Queen
 
@@ -47,27 +50,26 @@ data ChessState = ChessState {refBoard :: Array Coord ChessCell,
 -- TODO look into ben lynn's haskell js gui thing
 -- TODO show "white to move or black to move"
 instance Show ChessState where
-        show (ChessState b _ _ _ _ _ _)
+        show (ChessState b p wk wq bk bq turn)
                 = let ((br, bc), (er, ec)) = bounds b
                       colCoords = (\x -> "  " ++ x ++ "\n") $
                         concat [ [chr $ c + ord 'a', ' '] | c <- [bc..ec]]
                       rowCoords r row = let r' = 8 - r
                                         in show r' ++ row ++ "|" ++ show r' ++ "\n"
-                  in (\board -> colCoords ++ board ++ colCoords) $
-                       [br..er] >>= \r -> rowCoords r $
-                       [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
+                  in (++ (show turn ++ " to move\n\n"))
+                     . (\board -> colCoords ++ board ++ colCoords)
+                     $ [br..er] >>= \r -> rowCoords r
+                     $ [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
--- this operates on an array type
--- need to manage your scoping better
 at board coord | inBounds coord = board ! coord
                | otherwise      = OutOfBounds
 
 -- returns a list of valid moves
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
         let -- convenient predicates
-            -- TODO reduce duplicatation below ... template haskell?
+            -- TODO reduce duplication below ... template haskell?
             piecep coord = case at board coord of Piece _ _ -> True
                                                   _ -> False
             whitep coord = case at board coord of Piece White _ -> True
@@ -100,18 +102,14 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
             diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
             eightDirs = concat [horiz, vert, diag]
             ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
-            -- move/take cells pointed by dir within dist, blocked by sameColor
+            -- adds cells in direction of dirs until blocked by sameColor
             extend distance dirs = dirs >>= go distance
                     where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
                                       | otherwise = dst:(go (dist - 1) dir)
                                       where dst = plusTuple src dir
             
-            -- r1 and r2 are the same
+            -- TODO unit tests
             between (r1, c1) (r2, c2) = [(r1, c3) | c3 <- [(1 + min c1 c2)..((-1) + max c1 c2)]]
- 
-            -- king and castle must never moved before and cells between them are empty
-            -- for both kinds of castles
-            -- should just mark a boolean flag when either have moved inside the ChessGame state
             castle = [((0, 0), castleBQ, (0, -1)),
                       ((0, 7), castleBK, (0, 1)),
                       ((7, 0), castleWQ, (0, -1)),
