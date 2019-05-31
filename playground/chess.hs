@@ -10,7 +10,7 @@ data Role = Pawn | Rook | Knight | Bishop | King | Queen
 
 -- EnPassant Cells are marked with turn number of creation
 -- and treated like Empty
-data ChessCell = Empty | EnPassant Int | Piece Color Role
+data ChessCell = Empty | Piece Color Role | OutOfBounds
 
 -- TODO use polymorphism over switch/if/case
 -- create a ChessMove typeclass ... or look up other OO techs in haskell
@@ -19,7 +19,6 @@ data ChessCell = Empty | EnPassant Int | Piece Color Role
 
 instance Show ChessCell where
         show Empty = " "
-        show (EnPassant t) = show t
         show (Piece color role) =
                 case color of
                      White -> case role of
@@ -37,37 +36,61 @@ instance Show ChessCell where
                                    King -> "♚"
                                    Queen -> "♛"
 
+data ChessState = ChessState {refBoard :: Array Coord ChessCell,
+                              refEnpassant :: (Coord, Coord),
+                              refCastleWhiteKside :: Bool,
+                              refCastleWhiteQside :: Bool,
+                              refCastleBlackKside :: Bool,
+                              refCastleBlackQside :: Bool}
+
+-- TODO look into ben lynn's haskell js gui thing
+instance Show ChessState where
+        show (ChessState b _ _ _ _ _)
+                = let ((br, bc), (er, ec)) = bounds b
+                      colCoords = (\x -> "  " ++ x ++ "\n") $
+                        concat [ [chr $ c + ord 'a', ' '] | c <- [bc..ec]]
+                      rowCoords r row = let r' = 8 - r
+                                        in show r' ++ row ++ "|" ++ show r' ++ "\n"
+                  in (\board -> colCoords ++ board ++ colCoords) $
+                       [br..er] >>= \r -> rowCoords r $
+                       [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
+-- this operates on an array type
+-- need to manage your scoping better
+at board coord | inBounds coord = board ! coord
+               | otherwise      = OutOfBounds
+
 -- returns a list of valid moves
--- TODO en passant, castling, check limited, needs more game context
-moves (ChessBoard board) src =
-            -- convenient predicates
-        let piecep coord = (inBounds coord &&) $
-                case (board ! coord) of Piece _ _ -> True
-                                        _ -> False
-            whitep coord = matchWhite $ board ! coord
-                where matchWhite (Piece color _) = color == White
+moves (ChessState board passant castleWK castleWQ castleBK castleBQ) src =
+        let -- convenient predicates
+            -- TODO reduce duplicatation below ... template haskell?
+            piecep coord = case at board coord of Piece _ _ -> True
+                                                  _ -> False
+            whitep coord = case at board coord of Piece White _ -> True
+                                                  _ -> False
+            emptyp coord = case at board coord of Empty -> True
+                                                  _ -> False
             sameColor dst = piecep src && piecep dst && whitep src == whitep dst
             diffColor dst = piecep dst && piecep src && not (sameColor dst)
-            emptyp = not . piecep
-            hindrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
+            pawnrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
+            passantrowp coord@(r, _) = r == 2 && (not $ whitep coord) || r == 5 && whitep coord
 
             -- adds a delta to some coordinate
-            dest (r, c) (dr, dc) = (r + dr, c + dc)
+            plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
 
             -- unless blocked, can move 1 fwd and move 2 fwd if on starting row
-            pawnFwd dir = let dst = dest src dir
-                              dst2 = dest dst dir
-                          in if inBounds dst && emptyp dst
-                                then ([dst] ++) $ if inBounds dst2 && emptyp dst2 && hindrowp src
+            pawnFwd dir = let dst = plusTuple src dir
+                              dst2 = plusTuple dst dir
+                          in if emptyp dst
+                                then ([dst] ++) $ if emptyp dst2 && pawnrowp src
                                                      then [dst2] else []
                                 else []
-            -- checks opp piece colors and EnPassant in dest
+            -- checks opp piece colors and EnPassant in dst
             pawnTake dirs = dirs >>= \dir ->
-                let dst = dest src dir
-                in if inBounds dst && diffColor dst then [dst] else []
+                let dst = plusTuple src dir
+                in if diffColor dst || fst passant == dst && passantrowp src then [dst] else []
 
             -- dirs for input to extend
             horiz = [(0, 1), (0, -1)]
@@ -77,20 +100,26 @@ moves (ChessBoard board) src =
             ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
             -- move/take cells pointed by dir within dist, blocked by sameColor
             extend distance dirs = dirs >>= go distance
-                    where go dist dir | dist == 0
-                                        || outBounds dst
-                                        || sameColor dst = []
+                    where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
                                       | otherwise = dst:(go (dist - 1) dir)
-                                      where dst = dest src dir
+                                      where dst = plusTuple src dir
+            
+            -- r1 and r2 are the same
+            between (r1, c1) (r2, c2) = [(r1, c3) | c3 <- [(1 + min c1 c2)..((-1) + max c1 c2)]]
  
             -- king and castle must never moved before and cells between them are empty
             -- for both kinds of castles
             -- should just mark a boolean flag when either have moved inside the ChessGame state
-            castle = undefined
+            castle = [((0, 0), castleBQ, (0, -1)),
+                      ((0, 7), castleBK, (0, 1)),
+                      ((7, 0), castleWQ, (0, -1)),
+                      ((7, 7), castleWK, (0, 1))]
+                        >>= \(corner, bool, dir) -> if bool && all emptyp (between src corner)
+                                                       then [plusTuple src dir]
+                                                       else []
 
         -- TODO apply filter to list if the king is in check such that next moves must avoid check
-        in case board ! src of 
-                Empty -> []
+        in case at board src of 
                 Piece color role -> case role of
                         Pawn -> case color of
                                 Black -> pawnFwd (1, 0)
@@ -100,24 +129,11 @@ moves (ChessBoard board) src =
                         Rook -> extend 8 (horiz ++ vert)
                         Knight -> extend 1 ljump
                         Bishop -> extend 8 diag
-                        King -> extend 1 eightDirs -- ++ castle -- TODO define castle
+                        King -> extend 1 eightDirs ++ castle
                         Queen -> extend 8 eightDirs
+                _ -> []
 
-data ChessBoard = ChessBoard (Array Coord ChessCell)
-
--- TODO look into ben lynn's haskell js gui thing
-instance Show ChessBoard where
-        show (ChessBoard b)
-                = let ((br, bc), (er, ec)) = bounds b
-                      colCoords = (\x -> "  " ++ x ++ "\n") $
-                        concat [ [chr $ c + ord 'a', ' '] | c <- [bc..ec]]
-                      rowCoords r row = let r' = 8 - r
-                                        in show r' ++ row ++ "|" ++ show r' ++ "\n"
-                  in (\board -> colCoords ++ board ++ colCoords) $
-                       [br..er] >>= \r -> rowCoords r $
-                       [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
-
-chessBoard lst = ChessBoard $ array ((0, 0), (7, 7)) lst
+chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True
 
 -- construct the starting board position
 pawn_row = take 8 $ repeat Pawn
@@ -134,7 +150,7 @@ starting_position = [fmap (Piece Black) hind_row,
                      fmap (Piece White) hind_row]
 
 starting_board
-    = chessBoard $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
+    = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
                        (concat starting_position)
 
 -- TODO read games using algebraic notation
