@@ -19,12 +19,17 @@ instance Show Color where
 
 data Role = Pawn | Rook | Knight | Bishop | King | Queen
 
--- EnPassant Cells are marked with turn number of creation
--- and treated like Empty
-data ChessCell = Empty | Piece Color Role | OutOfBounds
+data ChessCell = Empty
+               | Piece {refColor :: Color, refRole :: Role}
+               | OutOfBounds
 
-data ChessState = ChessState { refBoard :: Array Coord ChessCell
+type ChessBoard = Array Coord ChessCell
+
+data ChessState = ChessState { refBoard :: ChessBoard
+                             -- (square to move, pawn to take)
+                             -- (8,8) for invalid
                              , refEnpassant :: (Coord, Coord)
+                             -- True for can castle
                              , refCastleWhiteKside :: Bool
                              , refCastleWhiteQside :: Bool
                              , refCastleBlackKside :: Bool
@@ -69,16 +74,20 @@ boardRow :: Int -> [Char] -> String
 boardRow r cells = r' ++ interleave (repeat '|') (cells ++ r')
     where r' = show $ 8 - r
 
+rowVals :: Array Coord ChessCell -> Int -> String
+rowVals b r = [pieceChar $ b ! (r, c) | c <- [0..7]]
+
+boardGrid :: Array Coord ChessCell -> [String]
+boardGrid b = [boardRow r (rowVals b r) | r <- [0..7]]
+
 instance Show ChessState where
-    show (ChessState b p wk wq bk bq turn)
-        = let ((br, bc), (er, ec)) = bounds b
-              rowVals r = [pieceChar $ b ! (r, c) | c <- [bc..ec]]
-              board = [br..er] >>= \r -> [boardRow r (rowVals r)]
-              in unlines $ coordRow:board ++ [ coordRow
-                                             , show turn ++ " to move"
-                                             , show bq ++ " " ++ show bk
-                                             , show wq ++ " " ++ show wk
-                                             ]
+        show (ChessState b p wk wq bk bq turn)
+                = unlines $ coordRow:(boardGrid b) ++
+                [coordRow,
+                 show turn ++ " to move",
+                 show bq ++ " " ++ show bk,
+                 show wq ++ " " ++ show wk,
+                 show p]
 
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
@@ -103,51 +112,64 @@ emptyp Empty = True
 emptyp _ = False
 
 teamp :: ChessCell -> ChessCell -> Bool
-teamp src dst = piecep src && piecep dst && whitep src == whitep dst
+teamp x y = piecep x && piecep y && whitep x == whitep y
 teamp _ _ = False
 
 enemyp :: ChessCell -> ChessCell -> Bool
-enemyp src dst = piecep dst && piecep src && whitep src /= whitep dst
+enemyp x y = piecep y && piecep x && whitep x /= whitep y
 enemyp _ _ = False
 
-pawnrowp :: Coord -> ChessCell -> Bool
-pawnrowp coord@(r, _) cell = r == 1 && blackp cell || r == 6 && whitep cell
+type SrcCtx = (ChessBoard, Coord)
 
+pawnrowp :: SrcCtx -> Bool
+pawnrowp :: Coord -> ChessCell -> Bool
+pawnrowp (board, (r, c)) = r == 1 && blackp piece || r == 6 && whitep piece
+        where piece = at board (r, c)
+
+-- a row which a pawn has possibility of executing an enpassant
 passantrowp :: Coord -> ChessCell -> Bool
-passantrowp coord@(r, _) cell = r == 2 && blackp cell || r == 5 && whitep cell
+passantrowp coord@(r, _) Black | r == 2 = blackp cell || r == 5 && whitep cell
 
 plusTuple :: Num a => (a, a) -> (a, a) -> (a, a)
 plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
 
-plusPiece :: Array Coord ChessCell -> Coord -> Coord -> (ChessCell, Coord)
+plusPiece :: ChessBoard -> Coord -> Coord -> (ChessCell, Coord)
 plusPiece board c1 c2 = let dst = plusTuple c1 c2 in (at board dst, dst)
+
+-- dirs for input to extend
+horiz = [(0, 1), (0, -1)]
+vert = [(1, 0), (-1, 0)]
+diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
+eightDirs = concat [horiz, vert, diag]
+ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
+
+keepTrue :: [(Bool, a)] -> [a]
+keepTrue [] = []
+keepTrue ((bool, x):lst) | bool = x:(keepTrue lst)
+                         | otherwise = keepTrue lst
+
+pawnFwd board src dir
+        = let psrc = at board src
+              (p1, c1) = plusPiece board src dir
+              (p2, c2) = plusPiece board c1 dir
+              in keepTrue [(emptyp p1, p1),
+                           (emptyp p1 && emptyp p2 && pawnrowp src (at board src), p2)]
+
+pawnTake board src dirs =
 
 moves :: ChessState -> Coord -> [Coord]
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
-        let pp = plusPiece board
-            pawnFwd dir = let (p1, c1) = pp src dir
-                              (p2, c2) = pp c1 dir
-                          in if emptyp p1
-                                then [p1] ++ if emptyp p2 && pawnrowp src
-                                                     then [p2] else []
-                                else []
-            -- checks opp piece colors and EnPassant in dst
-            pawnTake dirs = dirs >>= \dir ->
-                let dst = plusTuple src dir
-                    p = at board dst
-                in if diffColor p || fst passant == dst && passantrowp src then [dst] else []
+        let pawnTake dirs = dirs >>= \dir ->
+                    let (p, dst) = pPlus src dir
+                        in if enemyp psrc p || fst passant == dst && passantrowp src psrc
+                              then [dst]
+                              else []
 
-            -- dirs for input to extend
-            horiz = [(0, 1), (0, -1)]
-            vert = [(1, 0), (-1, 0)]
-            diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
-            eightDirs = concat [horiz, vert, diag]
-            ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
             -- adds cells in direction of dirs until blocked by sameColor
             extend distance dirs = dirs >>= go distance
-                    where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
+                    where go dist dir | dist == 0 || outBounds dst || teamp psrc p = []
                                       | otherwise = dst:(go (dist - 1) dir)
-                                      where dst = plusTuple src dir
+                                      where (p, dst) = pPlus src dir
             
             -- TODO unit tests
             between (r1, c1) (r2, c2) = [(r1, c3) | c3 <- [(1 + min c1 c2)..((-1) + max c1 c2)]]
