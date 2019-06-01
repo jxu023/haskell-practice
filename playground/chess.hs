@@ -1,6 +1,14 @@
 import Data.Array
 import Data.Char
+import Data.List
 import Debug.Trace
+
+-- TODO divide into modules/files
+-- ChessTypes.hs
+-- ChessChars.hs
+-- ChessRules.hs
+-- ChessGame.hs
+-- refer to ~/rwh/ examples
 
 type Coord = (Int, Int)
 
@@ -15,76 +23,110 @@ data Role = Pawn | Rook | Knight | Bishop | King | Queen
 -- and treated like Empty
 data ChessCell = Empty | Piece Color Role | OutOfBounds
 
+data ChessState = ChessState { refBoard :: Array Coord ChessCell
+                             , refEnpassant :: (Coord, Coord)
+                             , refCastleWhiteKside :: Bool
+                             , refCastleWhiteQside :: Bool
+                             , refCastleBlackKside :: Bool
+                             , refCastleBlackQside :: Bool
+                             , refTurn :: Color
+                             }
+
 -- TODO use polymorphism over switch/if/case
 -- create a ChessMove typeclass ... or look up other OO techs in haskell
 -- you'll get much smaller functions with less repetition than if divided by
 -- another method such as just creating another function
 
-instance Show ChessCell where
-        show Empty = " "
-        show (Piece color role) =
-                case color of
-                     White -> case role of
-                                   Pawn -> "♙"
-                                   Rook -> "♖"
-                                   Knight -> "♘"
-                                   Bishop -> "♗"
-                                   King -> "♔"
-                                   Queen -> "♕"
-                     Black -> case role of
-                                   Pawn -> "♟"
-                                   Rook -> "♜"
-                                   Knight -> "♞"
-                                   Bishop -> "♝"
-                                   King -> "♚"
-                                   Queen -> "♛"
+whiteChar role = case role of
+                        Pawn -> '♙'
+                        Rook -> '♖'
+                        Knight -> '♘'
+                        Bishop -> '♗'
+                        King -> '♔'
+                        Queen -> '♕'
 
-data ChessState = ChessState {refBoard :: Array Coord ChessCell,
-                              refEnpassant :: (Coord, Coord),
-                              refCastleWhiteKside :: Bool,
-                              refCastleWhiteQside :: Bool,
-                              refCastleBlackKside :: Bool,
-                              refCastleBlackQside :: Bool,
-                              refTurn :: Color}
+blackChar role = case role of
+                        Pawn -> '♟'
+                        Rook -> '♜'
+                        Knight -> '♞'
+                        Bishop -> '♝'
+                        King -> '♚'
+                        Queen -> '♛'
+
+pieceChar :: ChessCell -> Char
+pieceChar (Piece Black role) = blackChar role
+pieceChar (Piece White role) = whiteChar role
+pieceChar Empty = ' '
+
+coordRow :: String
+coordRow = ' ':[[' ', c], | c <- ['a'..'h']]
+
+wrapCoordRow x = coordRow ++ "\n" ++ x ++ coordRow ++ "\n"
+
+boardRow -> [Char] -> Int -> String
+boardRow cells r = r':[['|', c] | c <- cells ++ [r']]
+    where r' = show $ 8 - r
 
 -- TODO look into ben lynn's haskell js gui thing
--- TODO show "white to move or black to move"
 instance Show ChessState where
-        show (ChessState b p wk wq bk bq turn)
-                = let ((br, bc), (er, ec)) = bounds b
-                      colCoords = (\x -> "  " ++ x ++ "\n") $
-                        concat [ [chr $ c + ord 'a', ' '] | c <- [bc..ec]]
-                      rowCoords r row = let r' = 8 - r
-                                        in show r' ++ row ++ "|" ++ show r' ++ "\n"
+    show (ChessState b p wk wq bk bq turn) = wrapCoordRow board
+        where board = [br..er] >>= boardRow [pieceChar
+    
+    let ((br, bc), (er, ec)) = bounds b
+              boardLine = rowCoord:cells:'|':
+              rowCoords r row = let r' = 8 - r
+                                    in show r' ++ row ++ "|" ++ show r' ++ "\n"
                   in (++ (show turn ++ " to move\n\n"))
                      . (\board -> colCoords ++ board ++ colCoords)
                      $ [br..er] >>= \r -> rowCoords r
                      $ [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
+
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
 at board coord | inBounds coord = board ! coord
                | otherwise      = OutOfBounds
 
--- returns a list of valid moves
+-- TODO reduce duplication below ... template haskell?
+piecep board coord = case at board coord of Piece _ _ -> True
+                                            _         -> False
+
+piecep :: ChessCell -> Bool
+piecep (Piece _ _) = True
+piecep _ = False
+
+whitep :: ChessCell -> Bool
+whitep (Piece White _) = True
+whitep _ = False
+
+blackp :: ChessCell -> Bool
+blackp (Piece Black _) = True
+blackp _ = False
+
+emptyp:: ChessCell -> Bool
+emptyp Empty = True
+emptyp _ = False
+
+teamp :: ChessCell -> ChessCell -> Bool
+teamp src dst = piecep src && piecep dst && whitep src == whitep dst
+teamp _ _ = False
+
+enemyp :: ChessCell -> ChessCell -> Bool
+enemyp src dst = piecep dst && piecep src && whitep src /= whitep dst
+enemyp _ _ = False
+
+pawnrowp :: Coord -> ChessCell -> Bool
+pawnrowp coord@(r, _) cell = r == 1 && blackp cell || r == 6 && whitep coord
+
+passantrowp :: Coord -> ChessCell -> Bool
+passantrowp coord@(r, _) = r == 2 && blackp cell || r == 5 && whitep coord
+
+plusPair :: Num a => (a, a) -> (a, a) -> (a, a)
+plusPair (r, c) (dr, dc) = (r + dr, c + dc)
+
+moves :: ChessState -> Coord -> [Coord]
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
-        let -- convenient predicates
-            -- TODO reduce duplication below ... template haskell?
-            piecep coord = case at board coord of Piece _ _ -> True
-                                                  _ -> False
-            whitep coord = case at board coord of Piece White _ -> True
-                                                  _ -> False
-            emptyp coord = case at board coord of Empty -> True
-                                                  _ -> False
-            sameColor dst = piecep src && piecep dst && whitep src == whitep dst
-            diffColor dst = piecep dst && piecep src && not (sameColor dst)
-            pawnrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
-            passantrowp coord@(r, _) = r == 2 && (not $ whitep coord) || r == 5 && whitep coord
-
-            -- adds a delta to some coordinate
-            plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
-
-            -- unless blocked, can move 1 fwd and move 2 fwd if on starting row
+        let 
             pawnFwd dir = let dst = plusTuple src dir
                               dst2 = plusTuple dst dir
                           in if emptyp dst
@@ -161,8 +203,13 @@ starting_board
 --      or use code folding and save those into a session
 --     
 
-coords :: [(Int, Int)] -> [String]
+coords :: [Coord] -> [String]
 coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
+
+move :: ChessState -> Coord -> ChessState
+-- move state coord = let board = refBoard state
+                   --in 
+move = undefined
 
 queryMoveLoop = do
         putStr . show $ starting_board
