@@ -32,11 +32,12 @@ data ChessState = ChessState { refBoard :: Array Coord ChessCell
                              , refTurn :: Color
                              }
 
--- TODO use polymorphism over switch/if/case
+-- TODO consider polymorphism over switch/if/case
 -- create a ChessMove typeclass ... or look up other OO techs in haskell
 -- you'll get much smaller functions with less repetition than if divided by
 -- another method such as just creating another function
 
+-- TODO look into ben lynn's haskell js gui
 whiteChar role = case role of
                         Pawn -> '♙'
                         Rook -> '♖'
@@ -58,38 +59,32 @@ pieceChar (Piece Black role) = blackChar role
 pieceChar (Piece White role) = whiteChar role
 pieceChar Empty = ' '
 
+interleave :: String -> String -> String
+interleave a b = concat $ transpose [a, b]
+
 coordRow :: String
-coordRow = ' ':[[' ', c], | c <- ['a'..'h']]
+coordRow = " " ++ interleave (repeat ' ') ['a'..'h']
 
-wrapCoordRow x = coordRow ++ "\n" ++ x ++ coordRow ++ "\n"
-
-boardRow -> [Char] -> Int -> String
-boardRow cells r = r':[['|', c] | c <- cells ++ [r']]
+boardRow :: Int -> [Char] -> String
+boardRow r cells = r' ++ interleave (repeat '|') (cells ++ r')
     where r' = show $ 8 - r
 
--- TODO look into ben lynn's haskell js gui thing
 instance Show ChessState where
-    show (ChessState b p wk wq bk bq turn) = wrapCoordRow board
-        where board = [br..er] >>= boardRow [pieceChar
-    
-    let ((br, bc), (er, ec)) = bounds b
-              boardLine = rowCoord:cells:'|':
-              rowCoords r row = let r' = 8 - r
-                                    in show r' ++ row ++ "|" ++ show r' ++ "\n"
-                  in (++ (show turn ++ " to move\n\n"))
-                     . (\board -> colCoords ++ board ++ colCoords)
-                     $ [br..er] >>= \r -> rowCoords r
-                     $ [bc..ec] >>= \c -> "|" ++ show (b ! (r, c))
+    show (ChessState b p wk wq bk bq turn)
+        = let ((br, bc), (er, ec)) = bounds b
+              rowVals r = [pieceChar $ b ! (r, c) | c <- [bc..ec]]
+              board = [br..er] >>= \r -> [boardRow r (rowVals r)]
+              in unlines $ coordRow:board ++ [ coordRow
+                                             , show turn ++ " to move"
+                                             , show bq ++ " " ++ show bk
+                                             , show wq ++ " " ++ show wk
+                                             ]
 
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
 
 at board coord | inBounds coord = board ! coord
                | otherwise      = OutOfBounds
-
--- TODO reduce duplication below ... template haskell?
-piecep board coord = case at board coord of Piece _ _ -> True
-                                            _         -> False
 
 piecep :: ChessCell -> Bool
 piecep (Piece _ _) = True
@@ -116,27 +111,31 @@ enemyp src dst = piecep dst && piecep src && whitep src /= whitep dst
 enemyp _ _ = False
 
 pawnrowp :: Coord -> ChessCell -> Bool
-pawnrowp coord@(r, _) cell = r == 1 && blackp cell || r == 6 && whitep coord
+pawnrowp coord@(r, _) cell = r == 1 && blackp cell || r == 6 && whitep cell
 
 passantrowp :: Coord -> ChessCell -> Bool
-passantrowp coord@(r, _) = r == 2 && blackp cell || r == 5 && whitep coord
+passantrowp coord@(r, _) cell = r == 2 && blackp cell || r == 5 && whitep cell
 
-plusPair :: Num a => (a, a) -> (a, a) -> (a, a)
-plusPair (r, c) (dr, dc) = (r + dr, c + dc)
+plusTuple :: Num a => (a, a) -> (a, a) -> (a, a)
+plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
+
+plusPiece :: Array Coord ChessCell -> Coord -> Coord -> (ChessCell, Coord)
+plusPiece board c1 c2 = let dst = plusTuple c1 c2 in (at board dst, dst)
 
 moves :: ChessState -> Coord -> [Coord]
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
-        let 
-            pawnFwd dir = let dst = plusTuple src dir
-                              dst2 = plusTuple dst dir
-                          in if emptyp dst
-                                then ([dst] ++) $ if emptyp dst2 && pawnrowp src
-                                                     then [dst2] else []
+        let pp = plusPiece board
+            pawnFwd dir = let (p1, c1) = pp src dir
+                              (p2, c2) = pp c1 dir
+                          in if emptyp p1
+                                then [p1] ++ if emptyp p2 && pawnrowp src
+                                                     then [p2] else []
                                 else []
             -- checks opp piece colors and EnPassant in dst
             pawnTake dirs = dirs >>= \dir ->
                 let dst = plusTuple src dir
-                in if diffColor dst || fst passant == dst && passantrowp src then [dst] else []
+                    p = at board dst
+                in if diffColor p || fst passant == dst && passantrowp src then [dst] else []
 
             -- dirs for input to extend
             horiz = [(0, 1), (0, -1)]
