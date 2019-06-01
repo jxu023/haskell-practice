@@ -1,14 +1,22 @@
 import Data.Array
 import Data.Char
 import Data.List
-import Debug.Trace
 
--- TODO divide into modules/files
--- ChessTypes.hs
--- ChessChars.hs
--- ChessRules.hs
--- ChessGame.hs
--- refer to ~/rwh/ examples
+{-
+- TODOs
+-
+-
+- divide into modules/files
+-   ChessTypes.hs
+-   ChessChars.hs
+-   ChessRules.hs
+-   ChessGame.hs
+- refer to ~/rwh/ examples
+-
+- unit testing
+-
+- read games using algebraic notation
+-}
 
 type Coord = (Int, Int)
 
@@ -38,9 +46,7 @@ data ChessState = ChessState { refBoard :: ChessBoard
                              }
 
 -- TODO consider polymorphism over switch/if/case
--- create a ChessMove typeclass ... or look up other OO techs in haskell
--- you'll get much smaller functions with less repetition than if divided by
--- another method such as just creating another function
+-- ChessMove typeclass ... or look up other OO techs in haskell
 
 -- TODO look into ben lynn's haskell js gui
 whiteChar role = case role of
@@ -95,83 +101,63 @@ inBounds = not . outBounds
 at board coord | inBounds coord = board ! coord
                | otherwise      = OutOfBounds
 
-piecep :: ChessCell -> Bool
-piecep (Piece _ _) = True
-piecep _ = False
-
-whitep :: ChessCell -> Bool
-whitep (Piece White _) = True
-whitep _ = False
-
-blackp :: ChessCell -> Bool
-blackp (Piece Black _) = True
-blackp _ = False
-
-emptyp:: ChessCell -> Bool
-emptyp Empty = True
-emptyp _ = False
-
-teamp :: ChessCell -> ChessCell -> Bool
-teamp x y = piecep x && piecep y && whitep x == whitep y
-teamp _ _ = False
-
-enemyp :: ChessCell -> ChessCell -> Bool
-enemyp x y = piecep y && piecep x && whitep x /= whitep y
-enemyp _ _ = False
-
-type SrcCtx = (ChessBoard, Coord)
-
-pawnrowp :: SrcCtx -> Bool
-pawnrowp :: Coord -> ChessCell -> Bool
-pawnrowp (board, (r, c)) = r == 1 && blackp piece || r == 6 && whitep piece
-        where piece = at board (r, c)
-
--- a row which a pawn has possibility of executing an enpassant
-passantrowp :: Coord -> ChessCell -> Bool
-passantrowp coord@(r, _) Black | r == 2 = blackp cell || r == 5 && whitep cell
-
-plusTuple :: Num a => (a, a) -> (a, a) -> (a, a)
-plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
-
-plusPiece :: ChessBoard -> Coord -> Coord -> (ChessCell, Coord)
-plusPiece board c1 c2 = let dst = plusTuple c1 c2 in (at board dst, dst)
-
--- dirs for input to extend
-horiz = [(0, 1), (0, -1)]
-vert = [(1, 0), (-1, 0)]
-diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
-eightDirs = concat [horiz, vert, diag]
-ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
-
 keepTrue :: [(Bool, a)] -> [a]
 keepTrue [] = []
 keepTrue ((bool, x):lst) | bool = x:(keepTrue lst)
                          | otherwise = keepTrue lst
 
+{-
 pawnFwd board src dir
         = let psrc = at board src
               (p1, c1) = plusPiece board src dir
               (p2, c2) = plusPiece board c1 dir
               in keepTrue [(emptyp p1, p1),
                            (emptyp p1 && emptyp p2 && pawnrowp src (at board src), p2)]
+-}
 
-pawnTake board src dirs =
+-- directions that chesspieces can move in
+horiz :: [Coord]
+horiz = [(0, 1), (0, -1)]
+vert = [(1, 0), (-1, 0)]
+diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
+eightDirs = concat [horiz, vert, diag]
+ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
 
+-- TODO for move execution apply filter to list if the king is in check such that next moves must avoid check
+-- returns a list of valid moves
 moves :: ChessState -> Coord -> [Coord]
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
-        let pawnTake dirs = dirs >>= \dir ->
-                    let (p, dst) = pPlus src dir
-                        in if enemyp psrc p || fst passant == dst && passantrowp src psrc
-                              then [dst]
-                              else []
+        let piecep coord = case at board coord of Piece _ _ -> True
+                                                  _ -> False
+            whitep coord = case at board coord of Piece White _ -> True
+                                                  _ -> False
+            emptyp coord = case at board coord of Empty -> True
+                                                  _ -> False
+            sameColor dst = piecep src && piecep dst && whitep src == whitep dst
+            diffColor dst = piecep dst && piecep src && not (sameColor dst)
+            pawnrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
+            -- TODO .. make sure colors are not switched
+            passantrowp coord@(r, _) = r == 2 && (not $ whitep coord) || r == 5 && whitep coord
 
-            -- adds cells in direction of dirs until blocked by sameColor
+            plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
+
+            -- TODO rewrite with keepTrue
+            pawnFwd dir = let dst = plusTuple src dir
+                              dst2 = plusTuple dst dir
+                          in if emptyp dst
+                                then ([dst] ++) $ if emptyp dst2 && pawnrowp src
+                                                     then [dst2] else []
+                                else []
+            -- TODO rewrite with keepTrue, check enpassant logic
+            pawnTake dirs = dirs >>= \dir ->
+                let dst = plusTuple src dir
+                in if diffColor dst || fst passant == dst && passantrowp src then [dst] else []
+
             extend distance dirs = dirs >>= go distance
-                    where go dist dir | dist == 0 || outBounds dst || teamp psrc p = []
+                    where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
                                       | otherwise = dst:(go (dist - 1) dir)
-                                      where (p, dst) = pPlus src dir
+                                      where dst = plusTuple src dir
             
-            -- TODO unit tests
             between (r1, c1) (r2, c2) = [(r1, c3) | c3 <- [(1 + min c1 c2)..((-1) + max c1 c2)]]
             castle = [((0, 0), castleBQ, (0, -1)),
                       ((0, 7), castleBK, (0, 1)),
@@ -181,7 +167,6 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                                                        then [plusTuple src dir]
                                                        else []
 
-        -- TODO apply filter to list if the king is in check such that next moves must avoid check
         in case at board src of 
                 Piece color role -> if color /= turn then [] else case role of
                         Pawn -> case color of
@@ -216,20 +201,10 @@ starting_board
     = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
                        (concat starting_position)
 
--- TODO read games using algebraic notation
-
--- TODO look at real world haskell examples to use Modules correctly
---      then divide up your code into separate files.
-
---      or use code folding and save those into a session
---     
-
 coords :: [Coord] -> [String]
 coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
 
 move :: ChessState -> Coord -> ChessState
--- move state coord = let board = refBoard state
-                   --in 
 move = undefined
 
 queryMoveLoop = do
