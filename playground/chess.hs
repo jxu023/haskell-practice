@@ -1,6 +1,5 @@
 import Data.Array
 import Data.Char
-import Data.List
 
 {-
 - TODOs
@@ -16,6 +15,19 @@ import Data.List
 - unit testing
 -
 - read games using algebraic notation
+-
+- consider alterantive ways to express game rules or arbitrary constraints
+- some kind of dsl? look up logic programming
+- essentially it should just eliminate a whole bunch of possible rules
+-   could do something like apply a filter onto certain "move types"
+-   e.g. king cannot castle while in check, filter 2-space king moves
+-
+-   kind of an odd way to characterize
+-   should write out the rules in natural language first and then write code
+-   it'll make the code more readable in that fashion
+-   literate programming eh?
+-
+- look into ben lynn's haskell js gui
 -}
 
 type Coord = (Int, Int)
@@ -34,10 +46,7 @@ data ChessCell = Empty
 type ChessBoard = Array Coord ChessCell
 
 data ChessState = ChessState { refBoard :: ChessBoard
-                             -- (square to move, pawn to take)
-                             -- (8,8) for invalid
                              , refEnpassant :: (Coord, Coord)
-                             -- True for can castle
                              , refCastleWhiteKside :: Bool
                              , refCastleWhiteQside :: Bool
                              , refCastleBlackKside :: Bool
@@ -47,8 +56,6 @@ data ChessState = ChessState { refBoard :: ChessBoard
 
 -- TODO consider polymorphism over switch/if/case
 -- ChessMove typeclass ... or look up other OO techs in haskell
-
--- TODO look into ben lynn's haskell js gui
 whiteChar role = case role of
                         Pawn -> '♙'
                         Rook -> '♖'
@@ -71,7 +78,9 @@ pieceChar (Piece White role) = whiteChar role
 pieceChar Empty = ' '
 
 interleave :: String -> String -> String
-interleave a b = concat $ transpose [a, b]
+interleave _ [] = []
+interleave [] _ = []
+interleave (a:as) (b:bs) = a:b:(interleave as bs)
 
 coordRow :: String
 coordRow = " " ++ interleave (repeat ' ') ['a'..'h']
@@ -91,9 +100,9 @@ instance Show ChessState where
                 = unlines $ coordRow:(boardGrid b) ++
                 [coordRow,
                  show turn ++ " to move",
-                 show bq ++ " " ++ show bk,
-                 show wq ++ " " ++ show wk,
-                 show p]
+                 "castle " ++ show bq ++ " " ++ show bk,
+                 "castle " ++ show wq ++ " " ++ show wk,
+                 "Enpassant " ++ show p]
 
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
@@ -106,16 +115,6 @@ keepTrue [] = []
 keepTrue ((bool, x):lst) | bool = x:(keepTrue lst)
                          | otherwise = keepTrue lst
 
-{-
-pawnFwd board src dir
-        = let psrc = at board src
-              (p1, c1) = plusPiece board src dir
-              (p2, c2) = plusPiece board c1 dir
-              in keepTrue [(emptyp p1, p1),
-                           (emptyp p1 && emptyp p2 && pawnrowp src (at board src), p2)]
--}
-
--- directions that chesspieces can move in
 horiz :: [Coord]
 horiz = [(0, 1), (0, -1)]
 vert = [(1, 0), (-1, 0)]
@@ -123,51 +122,45 @@ diag = [(i, j) | i <- [-1, 1], j <- [-1, 1]]
 eightDirs = concat [horiz, vert, diag]
 ljump = [(i, j) | i <- [-1, 1, 2, -2], j <- [-1, 1, 2, -2], abs i /= abs j]
 
--- TODO for move execution apply filter to list if the king is in check such that next moves must avoid check
--- returns a list of valid moves
+plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
+
+-- TODO check rules, must move out of check, cannot castle in or out of check
 moves :: ChessState -> Coord -> [Coord]
 moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
         let piecep coord = case at board coord of Piece _ _ -> True
                                                   _ -> False
             whitep coord = case at board coord of Piece White _ -> True
                                                   _ -> False
+            blackp coord = case at board coord of Piece Black _ -> True
+                                                  _ -> False
             emptyp coord = case at board coord of Empty -> True
                                                   _ -> False
             sameColor dst = piecep src && piecep dst && whitep src == whitep dst
             diffColor dst = piecep dst && piecep src && not (sameColor dst)
-            pawnrowp coord@(r, _) = r == 1 && (not $ whitep coord) || r == 6 && whitep coord
-            -- TODO .. make sure colors are not switched
-            passantrowp coord@(r, _) = r == 2 && (not $ whitep coord) || r == 5 && whitep coord
-
-            plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
-
-            -- TODO rewrite with keepTrue
+            pawnrowp coord@(r, _) = r == 1 && blackp coord || r == 6 && whitep coord
+            passantrowp coord@(r, _) = r == 2 && whitep coord || r == 5 && blackp coord
+            -- pawn movement
             pawnFwd dir = let dst = plusTuple src dir
                               dst2 = plusTuple dst dir
-                          in if emptyp dst
-                                then ([dst] ++) $ if emptyp dst2 && pawnrowp src
-                                                     then [dst2] else []
-                                else []
-            -- TODO rewrite with keepTrue, check enpassant logic
+                              in keepTrue [(emptyp dst, dst),
+                                           (emptyp dst && emptyp dst2 && pawnrowp src, dst2)]
             pawnTake dirs = dirs >>= \dir ->
-                let dst = plusTuple src dir
-                in if diffColor dst || fst passant == dst && passantrowp src then [dst] else []
-
+                    let dst = plusTuple src dir
+                        in keepTrue [(diffColor dst || fst passant == dst && passantrowp src, dst)]
+            -- non-pawn movement
             extend distance dirs = dirs >>= go distance
                     where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
                                       | otherwise = dst:(go (dist - 1) dir)
                                       where dst = plusTuple src dir
-            
+            -- castling
             between (r1, c1) (r2, c2) = [(r1, c3) | c3 <- [(1 + min c1 c2)..((-1) + max c1 c2)]]
             castle = [((0, 0), castleBQ, (0, -1)),
                       ((0, 7), castleBK, (0, 1)),
                       ((7, 0), castleWQ, (0, -1)),
                       ((7, 7), castleWK, (0, 1))]
-                        >>= \(corner, bool, dir) -> if bool && all emptyp (between src corner)
-                                                       then [plusTuple src dir]
-                                                       else []
-
-        in case at board src of 
+                        >>= \(corner, bool, dir) ->
+                                keepTrue [(bool && all emptyp (between src corner), plusTuple src dir)]
+            in case at board src of 
                 Piece color role -> if color /= turn then [] else case role of
                         Pawn -> case color of
                                 Black -> pawnFwd (1, 0)
@@ -183,11 +176,9 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
 
 chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White
 
--- construct the starting board position
 pawn_row = take 8 $ repeat Pawn
 hind_row = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
 empty_row = take 8 $ repeat Empty
-
 starting_position = [fmap (Piece Black) hind_row,
                      fmap (Piece Black) pawn_row,
                      empty_row,
@@ -204,8 +195,29 @@ starting_board
 coords :: [Coord] -> [String]
 coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
 
-move :: ChessState -> Coord -> ChessState
-move = undefined
+move :: ChessState -> Coord -> Coord -> ChessState
+move state@(ChessState board passant wk wq bk bq turn) src dst
+        = state { refBoard = board'
+                , refEnpassant = passant'
+                , refCastleWhiteKside = wk'
+                , refCastleWhiteQside = wq'
+                , refCastleBlackKside = bk'
+                , refCastleBlackQside = bq'
+                , refTurn = otherColor turn
+                }
+        where board = refBoard state
+              srcPiece = at board src
+              board' = board // [(src, Empty), (dst, srcPiece)]
+                                 -- ++ keepTrue [(castlep, (rookDst, rookPiece)),
+                                 --              (castlep, (rookSrc, Empty)),
+                                 --              (passantp, (passantSrc, Empty))]
+              passant' = passant
+              wk' = wk
+              wq' = wq
+              bk' = bk
+              bq' = bq
+              otherColor Black = White
+              otherColor White = Black
 
 queryMoveLoop = do
         putStr . show $ starting_board
@@ -215,5 +227,7 @@ queryMoveLoop = do
             c = ord (line !! 0) - (ord 'a')
         print . coords $ moves starting_board (r, c)
         queryMoveLoop
+
+--gameLoop = 
 
 main = queryMoveLoop
