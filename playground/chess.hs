@@ -4,6 +4,20 @@ import Data.Char
 {-
 - TODOs
 -
+- king check rules
+- input notation parsing
+- chat bot integration
+- unit tests
+-
+- create your own notation e.g. e2 to e4
+- let the game accept either notation
+-
+- prompt moves w/ algebraic notation e.g. Ne4
+- maintain a data structure containing location of every piece
+-    data PieceStatus = Dead | Live Coord
+- allows for faster retrieval
+- probably keep separate from gamestate
+- just maintain it side by side during game execution
 -
 - divide into modules/files
 -   ChessTypes.hs
@@ -11,10 +25,6 @@ import Data.Char
 -   ChessRules.hs
 -   ChessGame.hs
 - refer to ~/rwh/ examples
--
-- unit testing
--
-- read games using algebraic notation
 -
 - consider alterantive ways to express game rules or arbitrary constraints
 - some kind of dsl? look up logic programming
@@ -174,8 +184,12 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                         Queen -> extend 8 eightDirs
                 _ -> []
 
-move :: ChessState -> Coord -> Coord -> ChessState
-move state@(ChessState board passant wk wq bk bq turn) src dst
+validMove :: ChessState -> (Coord, Coord) -> Bool
+validMove state (src, dst) =
+        elem dst $ moves state src
+
+movePiece :: ChessState -> (Coord, Coord) -> ChessState
+movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
         = state { refBoard = board'
                 , refEnpassant = passant'
                 , refCastleWhiteKside = wk'
@@ -216,31 +230,39 @@ initialState
     = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
                        (concat starting_position)
 
-coords :: [Coord] -> [String]
-coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
+-- showCoords :: [Coord] -> [String]
+-- showCoords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
 
 validCoord :: String -> Bool
-validCoord = undefined
+validCoord str = length str == 2 && c0 >= 'a' && c0 <= 'h' && c1 >= '1' && c1 <= '8'
+        where c0 = str !! 0
+              c1 = str !! 1
 
 readCoord :: String -> Coord
 readCoord str = (8 - (ord (str !! 1) - (ord '0')),
                  ord (str !! 0) - (ord 'a'))
 
-queryMoveLoop = do
-        putStr . show $ initialState
-        putStr "moves for src: "
-        line <- getLine
-        print . coords $ moves initialState (readCoord line)
-        queryMoveLoop
+promptCoords :: IO (String, String)
+promptCoords =
+        putStrLn "choose piece to move [a-h][1-8]" >>
+        getLine >>= \srcLine ->
+                putStrLn "choose a dst [a-h][1-8]" >>
+                getLine >>= \dstLine ->
+                        return (srcLine, dstLine)
 
-playGame state = do
-        putStr . show $ state
-        putStrLn "choose a piece to move [a-h][1-8]"
-        srcLine <- getLine
-        let src = readCoord srcLine
-        putStrLn "choose a dst [a-h][1-8]"
-        dstLine <- getLine
-        let dst = readCoord dstLine
-        playGame $ move state src dst
+promptMove :: ChessState -> IO (Coord, Coord)
+promptMove state =
+        promptCoords >>= \(src, dst) ->
+                let move = (readCoord src, readCoord dst)
+                    in if validCoord src && validCoord dst && validMove state move
+                          then return move
+                          else putStr "invalid move\n" >>
+                          promptMove state
+
+playGame :: ChessState -> IO ()
+playGame state =
+        print state >>
+        promptMove state >>= \move ->
+                playGame $ movePiece state move
 
 main = playGame initialState
