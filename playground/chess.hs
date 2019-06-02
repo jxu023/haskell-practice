@@ -174,27 +174,6 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                         Queen -> extend 8 eightDirs
                 _ -> []
 
-chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White
-
-pawn_row = take 8 $ repeat Pawn
-hind_row = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
-empty_row = take 8 $ repeat Empty
-starting_position = [fmap (Piece Black) hind_row,
-                     fmap (Piece Black) pawn_row,
-                     empty_row,
-                     empty_row,
-                     empty_row,
-                     empty_row,
-                     fmap (Piece White) pawn_row,
-                     fmap (Piece White) hind_row]
-
-starting_board
-    = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
-                       (concat starting_position)
-
-coords :: [Coord] -> [String]
-coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
-
 move :: ChessState -> Coord -> Coord -> ChessState
 move state@(ChessState board passant wk wq bk bq turn) src dst
         = state { refBoard = board'
@@ -219,15 +198,49 @@ move state@(ChessState board passant wk wq bk bq turn) src dst
               otherColor Black = White
               otherColor White = Black
 
+chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White
+
+pawn_row = take 8 $ repeat Pawn
+hind_row = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
+empty_row = take 8 $ repeat Empty
+starting_position = [fmap (Piece Black) hind_row,
+                     fmap (Piece Black) pawn_row,
+                     empty_row,
+                     empty_row,
+                     empty_row,
+                     empty_row,
+                     fmap (Piece White) pawn_row,
+                     fmap (Piece White) hind_row]
+
+initialState
+    = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
+                       (concat starting_position)
+
+coords :: [Coord] -> [String]
+coords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
+
+validCoord :: String -> Bool
+validCoord = undefined
+
+readCoord :: String -> Coord
+readCoord str = (8 - (ord (str !! 1) - (ord '0')),
+                 ord (str !! 0) - (ord 'a'))
+
 queryMoveLoop = do
-        putStr . show $ starting_board
+        putStr . show $ initialState
         putStr "moves for src: "
         line <- getLine
-        let r = 8 - (ord (line !! 1) - (ord '0'))
-            c = ord (line !! 0) - (ord 'a')
-        print . coords $ moves starting_board (r, c)
+        print . coords $ moves initialState (readCoord line)
         queryMoveLoop
 
---gameLoop = 
+playGame state = do
+        putStr . show $ state
+        putStrLn "choose a piece to move [a-h][1-8]"
+        srcLine <- getLine
+        let src = readCoord srcLine
+        putStrLn "choose a dst [a-h][1-8]"
+        dstLine <- getLine
+        let dst = readCoord dstLine
+        playGame $ move state src dst
 
-main = queryMoveLoop
+main = playGame initialState
