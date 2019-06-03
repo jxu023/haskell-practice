@@ -2,8 +2,14 @@ import Data.Array
 import Data.Char
 import Data.List
 
-{-
-- TODOs
+{- TODOs
+- 
+- runghc chess < game.record
+-   do this to run games .. these can also serve as testcases
+-   just need to implement validation of the endstate
+-   good way to make regression tests
+-
+-   how about a fuzzer making random moves? and u validate by hand
 -
 - king check rules
 - input notation parsing
