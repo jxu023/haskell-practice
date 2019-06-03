@@ -135,6 +135,10 @@ otherColor White = Black
 diffTuple (r, c) (dr, dc) = (abs $ r - dr, abs $ c - dc)
 midTuple (r, c) (dr, dc) = (div (r + dr) 2, div (c + dc) 2)
 
+kingCastlep board (src, dst) =
+        case at board src of Piece _ King -> (== 2) . snd $ diffTuple src dst
+                             _ -> False
+
 movePiece :: ChessState -> (Coord, Coord) -> ChessState
 movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
         = state { refBoard = board'
@@ -164,8 +168,7 @@ movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
                                                      _ -> False
               kingMoved color = case at board src of Piece c King -> color == c
                                                      _ -> False
-              castlep = case at board src of Piece _ King -> (== 2) . snd $ diffTuple src dst
-                                             _ -> False
+              castlep = kingCastlep board (src, dst)
               (rookSrc, rookDst) = head $ keepTrue [(white && right, ((7, 7), (7, 5))),
                                                     (white && left,  ((7, 0), (7, 3))),
                                                     (black && right, ((0, 7), (0, 5))),
@@ -256,7 +259,6 @@ allMoves state = teamCoords state >>=
 allMoveDsts :: ChessState -> [Coord]
 allMoveDsts state = concat . map (moves state) $ teamCoords state
 
--- check rules, must move out of check, cannot castle in or out of check
 inCheck :: ChessState -> Bool
 inCheck state =
         let color = refTurn state
@@ -268,8 +270,8 @@ inCheck state =
 validMove :: ChessState -> (Coord, Coord) -> Bool
 validMove state (src, dst) =
         and [elem dst $ moves state src,
-             not . inCheck $ movePiece state (src, dst)]
--- TODO castling while in check is invalid move
+             not . inCheck $ movePiece state (src, dst),
+             not $ inCheck state && kingCastlep (refBoard state) (src, dst)]
 
 allValidMoves :: ChessState -> [(Coord, Coord)]
 allValidMoves state = filter (validMove state) $ allMoves state
@@ -309,11 +311,8 @@ readCoord str = (8 - (ord (str !! 1) - (ord '0')),
 
 promptCoords :: IO (String, String)
 promptCoords =
-        putStrLn "choose piece to move [a-h][1-8]" >>
-        getLine >>= \srcLine ->
-                putStrLn "choose a dst [a-h][1-8]" >>
-                getLine >>= \dstLine ->
-                        return (srcLine, dstLine)
+        putStr "your move [a-h][1-8][a-h][1-8]: " >>
+        getLine >>= \line -> return (take 2 line, drop 2 line)
 
 promptMove :: ChessState -> IO (Coord, Coord)
 promptMove state =
