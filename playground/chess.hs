@@ -201,7 +201,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
             sameColor dst = piecep src && piecep dst && whitep src == whitep dst
             diffColor dst = piecep dst && piecep src && not (sameColor dst)
             pawnrowp coord@(r, _) = r == 1 && blackp coord || r == 6 && whitep coord
-            passantrowp coord@(r, _) = r == 2 && whitep coord || r == 5 && blackp coord
+            passantrowp coord@(r, _) = r == 3 && whitep coord || r == 4 && blackp coord
             -- pawn movement
             pawnFwd dir = let dst = plusTuple src dir
                               dst2 = plusTuple dst dir
