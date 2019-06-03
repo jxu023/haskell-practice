@@ -108,6 +108,11 @@ rowVals b r = [pieceChar $ b ! (r, c) | c <- [0..7]]
 boardGrid :: Array Coord ChessCell -> [String]
 boardGrid b = [boardRow r (rowVals b r) | r <- [0..7]]
 
+showCoord :: Coord -> String
+showCoord (r, c) = if (r, c) /= (8, 8)
+                      then [chr $ ord 'a' + c, chr $ ord '0' + 8 - r]
+                      else "N/A"
+
 instance Show ChessState where
         show (ChessState b p wk wq bk bq turn)
                 = unlines $ coordRow:(boardGrid b) ++
@@ -115,7 +120,7 @@ instance Show ChessState where
                  show turn ++ " to move",
                  "castle " ++ show bq ++ " " ++ show bk,
                  "castle " ++ show wq ++ " " ++ show wk,
-                 "Enpassant " ++ show p]
+                 "Enpassant " ++ showCoord (fst p) ++ ", " ++ showCoord (snd p)]
 
 outBounds (dr, dc) = dr < 0 || dc < 0 || dr > 7 || dc > 7
 inBounds = not . outBounds
@@ -295,9 +300,6 @@ starting_position = [fmap (Piece Black) hind_row,
 initialState
     = chessState $ zip (concat [[(i, j) | j <- [0..7]] | i <- [0..7]])
                        (concat starting_position)
-
--- showCoords :: [Coord] -> [String]
--- showCoords lst = [(chr $ ord 'a' + c):(chr $ ord '0' + 8 - r):[] | (r, c) <- lst]
 
 validCoord :: String -> Bool
 validCoord str = length str == 2 && c0 >= 'a' && c0 <= 'h' && c1 >= '1' && c1 <= '8'
