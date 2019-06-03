@@ -226,8 +226,8 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
         in case at board src of 
                 Piece color role -> if color /= turn then [] else case role of
                         Pawn -> case color of
-                                     Black -> pawnFwd (1, 0) ++ pawnAtk [(-1, -1), (-1, 1)]
-                                     White -> pawnFwd (-1, 0) ++ pawnAtk [(1, -1), (1, 1)]
+                                     Black -> pawnFwd (1, 0) ++ pawnAtk [(1, -1), (1, 1)]
+                                     White -> pawnFwd (-1, 0) ++ pawnAtk [(-1, -1), (-1, 1)]
                         Rook -> extend 8 (horiz ++ vert)
                         Knight -> extend 1 ljump
                         Bishop -> extend 8 diag
