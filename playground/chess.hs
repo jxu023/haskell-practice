@@ -201,7 +201,6 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
             sameColor dst = piecep src && piecep dst && whitep src == whitep dst
             diffColor dst = piecep dst && piecep src && not (sameColor dst)
             pawnrowp coord@(r, _) = r == 1 && blackp coord || r == 6 && whitep coord
-            passantrowp coord@(r, _) = r == 3 && whitep coord || r == 4 && blackp coord
             -- pawn movement
             pawnFwd dir = let dst = plusTuple src dir
                               dst2 = plusTuple dst dir
@@ -209,7 +208,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                                        (emptyp dst && emptyp dst2 && pawnrowp src, dst2)]
             pawnAtk dirs = dirs >>= \dir ->
                     let dst = plusTuple src dir
-                    in keepTrue [(diffColor dst || fst passant == dst && passantrowp src, dst)]
+                    in keepTrue [(diffColor dst || fst passant == dst, dst)]
             -- non-pawn movement
             extend distance dirs = dirs >>= go distance
                     where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
