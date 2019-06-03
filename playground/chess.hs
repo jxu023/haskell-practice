@@ -132,6 +132,9 @@ otherColor :: Color -> Color
 otherColor Black = White
 otherColor White = Black
 
+diffTuple (r, c) (dr, dc) = (abs $ r - dr, abs $ c - dc)
+midTuple (r, c) (dr, dc) = (div (r + dr) 2, div (c + dc) 2)
+
 movePiece :: ChessState -> (Coord, Coord) -> ChessState
 movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
         = state { refBoard = board'
@@ -142,17 +145,35 @@ movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
                 , refCastleBlackQside = bq'
                 , refTurn = otherColor turn
                 }
-        where board = refBoard state
-              srcPiece = at board src
-              board' = board // [(src, Empty), (dst, srcPiece)]
-                                 -- ++ keepTrue [(castlep, (rookDst, rookPiece)),
-                                 --              (castlep, (rookSrc, Empty)),
-                                 --              (passantp, (passantSrc, Empty))]
-              passant' = passant
-              wk' = wk
-              wq' = wq
-              bk' = bk
-              bq' = bq
+        where srcPiece = at board src
+              board' = (board //) $  [(src, Empty), (dst, srcPiece)]
+                                     ++ keepTrue [(castlep, (rookDst, Piece turn Rook)),
+                                                  (castlep, (rookSrc, Empty)),
+                                                  (enPassantp, (snd passant, Empty))]
+              enPassantp = dst == fst passant && case at board src of Piece _ Pawn -> True
+                                                                      _ -> False
+              passant' = head $ keepTrue [(passantp, (midTuple src dst, dst)),
+                                          (True, ((8, 8), (8, 8)))]
+              passantp = case at board src of Piece _ Pawn -> (== 2) . fst $ diffTuple src dst 
+                                              _ -> False
+              wk' = and [wk, not $ rookMoved (7, 7), not $ kingMoved White]
+              wq' = and [wq, not $ rookMoved (7, 0), not $ kingMoved White]
+              bk' = and [bk, not $ rookMoved (0, 7), not $ kingMoved Black]
+              bq' = and [bq, not $ rookMoved (0, 0), not $ kingMoved Black]
+              rookMoved coord = case at board src of Piece _ Rook -> coord == src
+                                                     _ -> False
+              kingMoved color = case at board src of Piece c King -> color == c
+                                                     _ -> False
+              castlep = case at board src of Piece _ King -> (== 2) . snd $ diffTuple src dst
+                                             _ -> False
+              (rookSrc, rookDst) = head $ keepTrue [(white && right, ((7, 7), (7, 5))),
+                                                    (white && left,  ((7, 0), (7, 3))),
+                                                    (black && right, ((0, 7), (0, 5))),
+                                                    (black && left,  ((0, 0), (0, 3)))]
+              black = turn == Black
+              white = turn == White
+              left = snd dst < 4
+              right = snd dst > 4
 
 horiz :: [Coord]
 horiz = [(0, 1), (0, -1)]
@@ -183,7 +204,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                               dst2 = plusTuple dst dir
                           in keepTrue [(emptyp dst, dst),
                                        (emptyp dst && emptyp dst2 && pawnrowp src, dst2)]
-            pawnTake dirs = dirs >>= \dir ->
+            pawnAtk dirs = dirs >>= \dir ->
                     let dst = plusTuple src dir
                     in keepTrue [(diffColor dst || fst passant == dst && passantrowp src, dst)]
             -- non-pawn movement
@@ -202,8 +223,8 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
         in case at board src of 
                 Piece color role -> if color /= turn then [] else case role of
                         Pawn -> case color of
-                                     Black -> pawnFwd (1, 0) ++ pawnTake [(-1, -1), (-1, 1)]
-                                     White -> pawnFwd (-1, 0) ++ pawnTake [(1, -1), (1, 1)]
+                                     Black -> pawnFwd (1, 0) ++ pawnAtk [(-1, -1), (-1, 1)]
+                                     White -> pawnFwd (-1, 0) ++ pawnAtk [(1, -1), (1, 1)]
                         Rook -> extend 8 (horiz ++ vert)
                         Knight -> extend 1 ljump
                         Bishop -> extend 8 diag
@@ -228,10 +249,9 @@ teamCoords :: ChessState -> [Coord]
 teamCoords state = map fst . filter (teamp (refTurn state) . snd) $ assocs (refBoard state)
 
 allMoves :: ChessState -> [(Coord, Coord)]
-allMoves state =
-        teamCoords state >>=
-                \src -> moves state src >>=
-                        \dst -> [(src, dst)]
+allMoves state = teamCoords state >>=
+                    \src -> moves state src >>=
+                            \dst -> [(src, dst)]
 
 allMoveDsts :: ChessState -> [Coord]
 allMoveDsts state = concat . map (moves state) $ teamCoords state
@@ -249,6 +269,7 @@ validMove :: ChessState -> (Coord, Coord) -> Bool
 validMove state (src, dst) =
         and [elem dst $ moves state src,
              not . inCheck $ movePiece state (src, dst)]
+-- TODO castling while in check is invalid move
 
 allValidMoves :: ChessState -> [(Coord, Coord)]
 allValidMoves state = filter (validMove state) $ allMoves state
@@ -301,12 +322,13 @@ promptMove state =
                 in if validCoord src && validCoord dst && validMove state move
                       then return move
                       else putStr "invalid move\n" >>
-                      promptMove state
+                           promptMove state
 
 playGame :: ChessState -> IO ()
 playGame state =
         print state >>
-        promptMove state >>= \move ->
-                playGame $ movePiece state move
+        if gameOver state then putStr "game over!"
+                          else promptMove state >>= \move ->
+                                  playGame $ movePiece state move
 
 main = playGame initialState
