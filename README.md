@@ -1,5 +1,6 @@
 # haskell-practice
 gonna just write whatever, following are ideas..
+* generals.io
 * tic tac toe
 * 5 in a row
 * go
