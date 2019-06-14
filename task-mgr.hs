@@ -1,11 +1,9 @@
 
-import Data.Time.Clock (getCurrentTime)
-
-
-data Task = Task { description :: Description ,rules :: [Rule] }
-data Description = { header :: String, body :: String }
+daily = ["exercise",
+         "diet",
+         "work",
+         "haskell"]
 
 main = do
     putStrLn "hello world"
-    utc_time <- getCurrentTime
-    putStr $ show utc_time
+

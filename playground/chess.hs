@@ -327,7 +327,8 @@ promptMove state =
                 let move = (readCoord src, readCoord dst)
                 in if validCoord src && validCoord dst && validMove state move
                       then return move
-                      else putStr "invalid move\n" >>
+                      else putStr ("invalid move|" ++ show move ++ "|\n") >>
+                           putStr $ keepTrue [(validCoord src, show $ moves state src), (True, "")]
                            promptMove state
 
 playGame :: ChessState -> IO ()
