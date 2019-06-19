@@ -1,4 +1,3 @@
-
 import Data.Array
 
 data GoCell = Empty | Black | White | Star
@@ -31,8 +30,16 @@ mkBoard sz = GoBoard $ array ((0, 0), (m, m)) [((i, j), Empty) | i <- [0..m], j 
         where m = sz - 1
 
 addStars :: GoBoard -> [Coord] -> GoBoard
+addStars (GoBoard arr) lst = GoBoard $ arr // zip lst (repeat Star)
+
+opTuple (a, b) (c, d) op = (op a c, op b d)
+timesTuple a b = opTuple a b (*)
+plusTuple a b = opTuple a b (+)
 
 mk9Board :: GoBoard
 mk9Board = addStars (mkBoard 9) [(4, 4)]
+mk13Board = addStars (mkBoard 13) . zipWith plusTuple [(0, 0), (0, 12), (12, 0), (12, 12)]
+                                  $ map (timesTuple (3, 3)) [(1, 1), (1, -1), (-1, 1), (-1, -1)]
 
-main = putStrLn "hi" >> print mk9Board
+
+main = putStrLn "hi" >> print mk13Board

@@ -1,6 +1,7 @@
 import Data.Array
 import Data.Char
 import Data.List
+-- import Debug.Trace
 
 {- TODOs
 - 
@@ -209,8 +210,9 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                                                   _ -> False
             emptyp coord = case at board coord of Empty -> True
                                                   _ -> False
-            sameColor dst = piecep src && piecep dst && whitep src == whitep dst
-            diffColor dst = piecep dst && piecep src && not (sameColor dst)
+            piecesp dst = piecep src && piecep dst
+            sameColor dst = piecesp dst && whitep src == whitep dst
+            diffColor dst = piecesp dst && whitep src /= whitep dst
             pawnrowp coord@(r, _) = r == 1 && blackp coord || r == 6 && whitep coord
             -- pawn movement
             pawnFwd dir = let dst = plusTuple src dir
@@ -219,7 +221,7 @@ moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
                                        (emptyp dst && emptyp dst2 && pawnrowp src, dst2)]
             pawnAtk dirs = dirs >>= \dir ->
                     let dst = plusTuple src dir
-                    in keepTrue [(diffColor dst || fst passant == dst, dst)]
+                    in keepTrue [(diffColor dst || (fst passant == dst), dst)]
             -- non-pawn movement
             extend distance dirs = dirs >>= go distance
                     where go dist dir | dist == 0 || outBounds dst || sameColor dst = []
@@ -274,13 +276,13 @@ inCheck state =
         let color = refTurn state
             src = kingCoord (refBoard state) color
             res = find (== src) . allMoveDsts $ state { refTurn = otherColor color }
-        in case res of Just _ -> True
+        in case res of Just x -> True
                        _ -> False
 
 validMove :: ChessState -> (Coord, Coord) -> Bool
 validMove state (src, dst) =
         and [elem dst $ moves state src,
-             not . inCheck $ movePiece state (src, dst),
+             not . inCheck $ (movePiece state (src, dst)) { refTurn = refTurn state },
              not $ inCheck state && kingCastlep (refBoard state) (src, dst)]
 
 allValidMoves :: ChessState -> [(Coord, Coord)]
@@ -327,8 +329,8 @@ promptMove state =
                 let move = (readCoord src, readCoord dst)
                 in if validCoord src && validCoord dst && validMove state move
                       then return move
-                      else putStr ("invalid move|" ++ show move ++ "|\n") >>
-                           putStr $ keepTrue [(validCoord src, show $ moves state src), (True, "")]
+                      else putStr ("invalid move|" ++ (\(a, b) -> showCoord a ++ ", " ++ showCoord b) move ++ "|\n") >>
+                           print (keepTrue [(validCoord src, concat . map showCoord $ moves state (fst move)), (True, "")]) >>
                            promptMove state
 
 playGame :: ChessState -> IO ()
