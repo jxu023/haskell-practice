@@ -72,6 +72,7 @@ data ChessState = ChessState { refBoard :: ChessBoard
                              , refCastleBlackKside :: Bool
                              , refCastleBlackQside :: Bool
                              , refTurn :: Color
+                             , refPromo :: (Coord)
                              }
 
 -- TODO consider polymorphism over switch/if/case
@@ -121,7 +122,7 @@ showCoord (r, c) = if (r, c) /= (8, 8)
                       else "N/A"
 
 instance Show ChessState where
-        show (ChessState b p wk wq bk bq turn)
+        show (ChessState b p wk wq bk bq turn _)
                 = unlines $ coordRow:(boardGrid b) ++
                 [coordRow,
                  show turn ++ " to move",
@@ -152,7 +153,7 @@ kingCastlep board (src, dst) =
                              _ -> False
 
 movePiece :: ChessState -> (Coord, Coord) -> ChessState
-movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
+movePiece state@(ChessState board passant wk wq bk bq turn _) (src, dst)
         = state { refBoard = board'
                 , refEnpassant = passant'
                 , refCastleWhiteKside = wk'
@@ -160,6 +161,7 @@ movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
                 , refCastleBlackKside = bk'
                 , refCastleBlackQside = bq'
                 , refTurn = otherColor turn
+                , refPromo = promop
                 }
         where srcPiece = at board src
               board' = (board //) $  [(src, Empty), (dst, srcPiece)]
@@ -185,6 +187,8 @@ movePiece state@(ChessState board passant wk wq bk bq turn) (src, dst)
                                                     (white && left,  ((7, 0), (7, 3))),
                                                     (black && right, ((0, 7), (0, 5))),
                                                     (black && left,  ((0, 0), (0, 3)))]
+              promop = case at board src of Piece _ Pawn -> if fst dst == 0 || fst dst == 7 then dst else (8, 8)
+                                            _ -> (8, 8)
               black = turn == Black
               white = turn == White
               left = snd dst < 4
@@ -201,7 +205,7 @@ plusTuple (r, c) (dr, dc) = (r + dr, c + dc)
 
 -- characterizes piece movement
 moves :: ChessState -> Coord -> [Coord]
-moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn) src =
+moves (ChessState board passant castleWK castleWQ castleBK castleBQ turn _) src =
         let piecep coord = case at board coord of Piece _ _ -> True
                                                   _ -> False
             whitep coord = case at board coord of Piece White _ -> True
@@ -291,7 +295,7 @@ allValidMoves state = filter (validMove state) $ allMoves state
 gameOver :: ChessState -> Bool
 gameOver = null . allValidMoves
 
-chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White
+chessState lst = ChessState (array ((0, 0), (7, 7)) lst) ((8, 8), (8, 8)) True True True True White (8, 8)
 
 pawn_row = take 8 $ repeat Pawn
 hind_row = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
@@ -333,11 +337,24 @@ promptMove state =
                            print (keepTrue [(validCoord src, concat . map showCoord $ moves state (fst move)), (True, "")]) >>
                            promptMove state
 
+promoPawns :: ChessState -> IO ChessState
+promoPawns state =
+    if refPromo state == (8, 8)
+       then putStrLn "promote pawn to what? (Knight, Bishop, Queen, Rook)" >>
+            getLine >>= \line -> return . (promote state) . (\x -> Piece color x) $ case line of
+                                                                                "Knight" -> Knight
+                                                                                "Bishop" -> Bishop
+                                                                                "Queen" -> Queen
+                                                                                "Rook" -> Rook
+                                                                                _ -> Pawn
+        else return state
+    where promote state cell = state { refBoard = refBoard state // [(refPromo state, cell)] }
+          color = refTurn state
+
 playGame :: ChessState -> IO ()
 playGame state =
         print state >>
         if gameOver state then putStr "game over!"
-                          else promptMove state >>= \move ->
-                                  playGame $ movePiece state move
+                          else promptMove state >>= \move -> promoPawns (movePiece state move) >>= playGame
 
 main = playGame initialState
