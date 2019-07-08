@@ -38,8 +38,7 @@ plusTuple a b = opTuple a b (+)
 
 mk9Board :: GoBoard
 mk9Board = addStars (mkBoard 9) [(4, 4)]
-mk13Board = addStars (mkBoard 13) . zipWith plusTuple [(0, 0), (0, 12), (12, 0), (12, 12)]
+mk13Board = addStars (mkBoard 13) . (++) [(6, 6)] . zipWith plusTuple [(0, 0), (0, 12), (12, 0), (12, 12)]
                                   $ map (timesTuple (3, 3)) [(1, 1), (1, -1), (-1, 1), (-1, -1)]
-
 
 main = putStrLn "hi" >> print mk13Board
