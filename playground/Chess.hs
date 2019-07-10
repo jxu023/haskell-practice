@@ -1,3 +1,4 @@
+module Chess where
 import Data.Array
 import Data.Char
 import Data.List
@@ -357,4 +358,4 @@ playGame state =
         if gameOver state then putStr "game over!"
                           else promptMove state >>= \move -> promoPawns (movePiece state move) >>= playGame
 
-main = playGame initialState
+-- main = playGame initialState
