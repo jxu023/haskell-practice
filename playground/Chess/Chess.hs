@@ -1,53 +1,9 @@
 module Chess where
+
 import Data.Array
 import Data.Char
 import Data.List
 -- import Debug.Trace
-
-{- TODOs
-- 
-- runghc chess < game.record
--   do this to run games .. these can also serve as testcases
--   just need to implement validation of the endstate
--   good way to make regression tests
--
--   how about a fuzzer making random moves? and u validate by hand
--
-- king check rules
-- input notation parsing
-- chat bot integration
-- unit tests
--
-- create your own notation e.g. e2 to e4
-- let the game accept either notation
--
-- prompt moves w/ algebraic notation e.g. Ne4
-- maintain a data structure containing location of every piece
--    data PieceStatus = Dead | Live Coord
-- allows for faster retrieval
-- probably keep separate from gamestate
-- just maintain it side by side during game execution
--
-- divide into modules/files
--   ChessTypes.hs
--   ChessChars.hs
--   ChessRules.hs
--   ChessGame.hs
-- refer to ~/rwh/ examples
--
-- consider alterantive ways to express game rules or arbitrary constraints
-- some kind of dsl? look up logic programming
-- essentially it should just eliminate a whole bunch of possible rules
--   could do something like apply a filter onto certain "move types"
--   e.g. king cannot castle while in check, filter 2-space king moves
--
--   kind of an odd way to characterize
--   should write out the rules in natural language first and then write code
--   it'll make the code more readable in that fashion
--   literate programming eh?
--
-- look into ben lynn's haskell js gui
--}
 
 type Coord = (Int, Int)
 
@@ -358,4 +314,4 @@ playGame state =
         if gameOver state then putStr "game over!"
                           else promptMove state >>= \move -> promoPawns (movePiece state move) >>= playGame
 
--- main = playGame initialState
+main = playGame initialState
